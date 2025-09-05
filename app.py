@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, jsonify, send_file
+from flask import Flask, request, render_template, jsonify, send_file, session
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -8,9 +8,11 @@ import base64
 import os
 from werkzeug.utils import secure_filename
 import tempfile
+from datetime import datetime
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.secret_key = 'regina-sistema-educacional-2025'  # Para usar sessões
 
 # Configurar matplotlib para usar uma fonte que suporte caracteres especiais
 plt.rcParams['font.family'] = 'DejaVu Sans'
@@ -133,6 +135,131 @@ def criar_grafico_comparacao(dados_combinados):
     
     return img_base64
 
+def gerar_relatorio_markdown(dados_combinados, estatisticas, mensagens):
+    """
+    Gera um relatório em formato Markdown
+    """
+    df_dados = pd.DataFrame(dados_combinados)
+    data_atual = datetime.now().strftime("%d/%m/%Y às %H:%M")
+    
+    # Cabeçalho do relatório
+    md_content = f"""# Relatório de Análise Educacional
+
+**Data de Geração:** {data_atual}
+
+**Sistema:** Análise de Dados Educacionais - Região de Sertãozinho
+
+---
+
+## 📊 Resumo Executivo
+
+Este relatório apresenta a análise detalhada das planilhas educacionais processadas, incluindo dados das plataformas ALURA, LEIA e SPeak.
+
+### 📈 Estatísticas Gerais
+
+"""
+    
+    # Adicionar estatísticas por planilha
+    for planilha, stats in estatisticas.items():
+        md_content += f"""
+#### {planilha}
+- **Escolas analisadas:** {stats['escolas']}
+- **Média geral:** {stats['media']:.2f}
+- **Menor média:** {stats['minimo']:.2f}
+- **Maior média:** {stats['maximo']:.2f}
+
+"""
+    
+    # Mensagens de processamento
+    md_content += """
+---
+
+## 📝 Mensagens de Processamento
+
+"""
+    for msg in mensagens:
+        md_content += f"- ✅ {msg}\n"
+    
+    # Dados detalhados por planilha
+    md_content += """
+---
+
+## 📋 Dados Detalhados por Planilha
+
+"""
+    
+    for planilha in df_dados['Planilha'].unique():
+        dados_planilha = df_dados[df_dados['Planilha'] == planilha].sort_values('Media', ascending=False)
+        
+        md_content += f"""
+### {planilha}
+
+| Posição | Escola | Média | Valores Utilizados |
+|---------|--------|-------|-------------------|
+"""
+        
+        for idx, (_, row) in enumerate(dados_planilha.iterrows(), 1):
+            md_content += f"| {idx}º | {row['Escola']} | {row['Media']:.2f} | {row['Valores_Utilizados']} |\n"
+    
+    # Análise comparativa
+    md_content += """
+---
+
+## 📊 Análise Comparativa
+
+### Ranking Geral por Média (Todas as Planilhas)
+
+"""
+    
+    # Ranking geral
+    ranking_geral = df_dados.groupby('Escola')['Media'].mean().sort_values(ascending=False)
+    
+    md_content += """
+| Posição | Escola | Média Geral |
+|---------|--------|-------------|
+"""
+    
+    for idx, (escola, media) in enumerate(ranking_geral.items(), 1):
+        md_content += f"| {idx}º | {escola} | {media:.2f} |\n"
+    
+    # Observações
+    md_content += f"""
+---
+
+## 📋 Observações Técnicas
+
+### Metodologia
+- **Identificação automática** de colunas de escolas e dados numéricos
+- **Cálculo de médias** baseado em valores válidos encontrados
+- **Processamento de múltiplas planilhas** com consolidação de resultados
+
+### Dados Processados
+- **Total de registros:** {len(df_dados)}
+- **Planilhas analisadas:** {len(df_dados['Planilha'].unique())}
+- **Escolas únicas:** {len(df_dados['Escola'].unique())}
+
+---
+
+## 👥 Informações do Sistema
+
+**Desenvolvido por:** PEC Tecnologia - Davi Antonino Nunes da Silva URESER
+
+**Contato:** 
+- 📧 E-mail: davi.silva@educacao.sp.gov.br
+- 📱 Celular: 16 99260-4315
+
+**Solicitado por:** Regina Aparecida Pieruchi  
+**Cargo:** Chefe de Departamento – Dirigente Regional de Ensino de Sertãozinho
+
+**Finalidade:** Análises detalhadas dos dados das Escolas
+
+---
+
+*Relatório gerado automaticamente pelo Sistema de Análise Educacional em {data_atual}*
+"""
+    
+    return md_content
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -192,12 +319,21 @@ def upload_files():
                 'maximo': round(dados['Media'].max(), 2)
             }
         
+        # Salvar dados na sessão para download posterior
+        session['dados_analise'] = {
+            'dados': todos_resultados,
+            'estatisticas': estatisticas,
+            'mensagens': mensagens,
+            'timestamp': datetime.now().isoformat()
+        }
+        
         return jsonify({
             'success': True,
             'mensagens': mensagens,
             'dados': todos_resultados,
             'grafico': grafico_base64,
-            'estatisticas': estatisticas
+            'estatisticas': estatisticas,
+            'download_disponivel': True
         })
         
     except Exception as e:
