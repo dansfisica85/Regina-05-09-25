@@ -9,10 +9,11 @@ import os
 from werkzeug.utils import secure_filename
 import tempfile
 from datetime import datetime
+import json
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-app.secret_key = 'regina-sistema-educacional-2025'  # Para usar sessões
+app.secret_key = 'regina_analise_educacional_2025'  # Para sessions
 
 # Configurar matplotlib para usar uma fonte que suporte caracteres especiais
 plt.rcParams['font.family'] = 'DejaVu Sans'
@@ -137,125 +138,104 @@ def criar_grafico_comparacao(dados_combinados):
 
 def gerar_relatorio_markdown(dados_combinados, estatisticas, mensagens):
     """
-    Gera um relatório em formato Markdown
+    Gera um relatório completo em formato Markdown
     """
-    df_dados = pd.DataFrame(dados_combinados)
-    data_atual = datetime.now().strftime("%d/%m/%Y às %H:%M")
+    df_resultados = pd.DataFrame(dados_combinados)
     
-    # Cabeçalho do relatório
+    # Cabeçalho
     md_content = f"""# Relatório de Análise Educacional
 
-**Data de Geração:** {data_atual}
-
-**Sistema:** Análise de Dados Educacionais - Região de Sertãozinho
+**Data da Análise:** {datetime.now().strftime('%d/%m/%Y às %H:%M')}
 
 ---
 
 ## 📊 Resumo Executivo
 
-Este relatório apresenta a análise detalhada das planilhas educacionais processadas, incluindo dados das plataformas ALURA, LEIA e SPeak.
+Este relatório apresenta a análise detalhada dos dados educacionais processados pelo Sistema de Análise Educacional, desenvolvido para a Dirigente Regional de Ensino de Sertãozinho, Regina Aparecida Pieruchi.
 
 ### 📈 Estatísticas Gerais
 
+- **Total de Escolas Analisadas:** {len(df_resultados)}
+- **Planilhas Processadas:** {len(df_resultados['Planilha'].unique())}
+- **Média Geral:** {df_resultados['Media'].mean():.2f}
+
+---
+
+## 📋 Mensagens do Processamento
+
 """
     
-    # Adicionar estatísticas por planilha
+    for i, msg in enumerate(mensagens, 1):
+        md_content += f"{i}. {msg}\n"
+    
+    md_content += "\n---\n\n## 📊 Estatísticas por Planilha\n\n"
+    
+    # Estatísticas detalhadas por planilha
     for planilha, stats in estatisticas.items():
-        md_content += f"""
-#### {planilha}
-- **Escolas analisadas:** {stats['escolas']}
-- **Média geral:** {stats['media']:.2f}
-- **Menor média:** {stats['minimo']:.2f}
-- **Maior média:** {stats['maximo']:.2f}
+        md_content += f"""### 📄 {planilha}
+
+- **Escolas:** {stats['escolas']}
+- **Média:** {stats['media']}
+- **Valor Mínimo:** {stats['minimo']}
+- **Valor Máximo:** {stats['maximo']}
 
 """
     
-    # Mensagens de processamento
-    md_content += """
----
+    md_content += "---\n\n## 📋 Dados Detalhados por Escola\n\n"
+    
+    # Tabela detalhada
+    md_content += "| Escola | Planilha | Média | Valores Utilizados |\n"
+    md_content += "|--------|----------|-------|--------------------|\n"
+    
+    for item in dados_combinados:
+        escola = item['Escola'].replace('|', '\\|')  # Escapar pipes na tabela
+        planilha = item['Planilha'].replace('|', '\\|')
+        md_content += f"| {escola} | {planilha} | {item['Media']:.2f} | {item['Valores_Utilizados']} |\n"
+    
+    md_content += "\n---\n\n"
+    
+    # Análise por planilha
+    for planilha in df_resultados['Planilha'].unique():
+        dados_planilha = df_resultados[df_resultados['Planilha'] == planilha]
+        md_content += f"""## 🏫 Análise Detalhada - {planilha}
 
-## 📝 Mensagens de Processamento
+### Ranking das Escolas (por Média)
 
 """
-    for msg in mensagens:
-        md_content += f"- ✅ {msg}\n"
-    
-    # Dados detalhados por planilha
-    md_content += """
----
-
-## 📋 Dados Detalhados por Planilha
-
-"""
-    
-    for planilha in df_dados['Planilha'].unique():
-        dados_planilha = df_dados[df_dados['Planilha'] == planilha].sort_values('Media', ascending=False)
+        # Ordenar por média decrescente
+        dados_ordenados = dados_planilha.sort_values('Media', ascending=False)
+        
+        for idx, (_, row) in enumerate(dados_ordenados.iterrows(), 1):
+            emoji = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else "📊"
+            md_content += f"{idx}. {emoji} **{row['Escola']}** - Média: {row['Media']:.2f}\n"
         
         md_content += f"""
-### {planilha}
+### Estatísticas da Planilha
 
-| Posição | Escola | Média | Valores Utilizados |
-|---------|--------|-------|-------------------|
-"""
-        
-        for idx, (_, row) in enumerate(dados_planilha.iterrows(), 1):
-            md_content += f"| {idx}º | {row['Escola']} | {row['Media']:.2f} | {row['Valores_Utilizados']} |\n"
-    
-    # Análise comparativa
-    md_content += """
+- **Média da Planilha:** {dados_planilha['Media'].mean():.2f}
+- **Desvio Padrão:** {dados_planilha['Media'].std():.2f}
+- **Amplitude:** {dados_planilha['Media'].max() - dados_planilha['Media'].min():.2f}
+
 ---
-
-## 📊 Análise Comparativa
-
-### Ranking Geral por Média (Todas as Planilhas)
 
 """
     
-    # Ranking geral
-    ranking_geral = df_dados.groupby('Escola')['Media'].mean().sort_values(ascending=False)
-    
-    md_content += """
-| Posição | Escola | Média Geral |
-|---------|--------|-------------|
-"""
-    
-    for idx, (escola, media) in enumerate(ranking_geral.items(), 1):
-        md_content += f"| {idx}º | {escola} | {media:.2f} |\n"
-    
-    # Observações
-    md_content += f"""
----
+    # Rodapé
+    md_content += f"""## 👥 Créditos
 
-## 📋 Observações Técnicas
+**Sistema Desenvolvido por:**
+- **PEC Tecnologia**
+- **Davi Antonino Nunes da Silva URESER**
+- **E-mail:** davi.silva@educacao.sp.gov.br
+- **Celular:** 16 99260-4315
 
-### Metodologia
-- **Identificação automática** de colunas de escolas e dados numéricos
-- **Cálculo de médias** baseado em valores válidos encontrados
-- **Processamento de múltiplas planilhas** com consolidação de resultados
-
-### Dados Processados
-- **Total de registros:** {len(df_dados)}
-- **Planilhas analisadas:** {len(df_dados['Planilha'].unique())}
-- **Escolas únicas:** {len(df_dados['Escola'].unique())}
+**Solicitado por:**
+- **Regina Aparecida Pieruchi**
+- **Chefe de Departamento – Dirigente Regional de Ensino de Sertãozinho**
 
 ---
 
-## 👥 Informações do Sistema
-
-**Desenvolvido por:** PEC Tecnologia - Davi Antonino Nunes da Silva URESER
-
-**Contato:** 
-- 📧 E-mail: davi.silva@educacao.sp.gov.br
-- 📱 Celular: 16 99260-4315
-
-**Solicitado por:** Regina Aparecida Pieruchi  
-**Cargo:** Chefe de Departamento – Dirigente Regional de Ensino de Sertãozinho
-
-**Finalidade:** Análises detalhadas dos dados das Escolas
-
----
-
-*Relatório gerado automaticamente pelo Sistema de Análise Educacional em {data_atual}*
+*Relatório gerado automaticamente em {datetime.now().strftime('%d/%m/%Y às %H:%M')}*
 """
     
     return md_content
@@ -332,12 +312,55 @@ def upload_files():
             'mensagens': mensagens,
             'dados': todos_resultados,
             'grafico': grafico_base64,
-            'estatisticas': estatisticas,
-            'download_disponivel': True
+            'estatisticas': estatisticas
         })
         
     except Exception as e:
         return jsonify({'error': f'Erro no processamento: {str(e)}'}), 500
+
+@app.route('/download_relatorio')
+def download_relatorio():
+    """
+    Gera e faz download do relatório em formato Markdown
+    """
+    try:
+        if 'dados_analise' not in session:
+            return jsonify({'error': 'Nenhuma análise disponível para download. Faça uma nova análise primeiro.'}), 400
+        
+        dados_sessao = session['dados_analise']
+        
+        # Gerar relatório em Markdown
+        md_content = gerar_relatorio_markdown(
+            dados_sessao['dados'],
+            dados_sessao['estatisticas'],
+            dados_sessao['mensagens']
+        )
+        
+        # Criar arquivo temporário
+        temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8')
+        temp_file.write(md_content)
+        temp_file.close()
+        
+        # Nome do arquivo com timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'relatorio_analise_educacional_{timestamp}.md'
+        
+        def remove_file(response):
+            try:
+                os.unlink(temp_file.name)
+            except Exception:
+                pass
+            return response
+        
+        return send_file(
+            temp_file.name,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='text/markdown'
+        )
+        
+    except Exception as e:
+        return jsonify({'error': f'Erro ao gerar relatório: {str(e)}'}), 500
 
 @app.route('/health')
 def health_check():
