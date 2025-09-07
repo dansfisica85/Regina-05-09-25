@@ -291,6 +291,58 @@
             messagesEl.innerHTML = content;
             results.classList.remove('hidden');
         }
+
+        async function downloadRelatorio() {
+            try {
+                const response = await fetch('/download_relatorio', {
+                    method: 'GET'
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    
+                    // Extrair nome do arquivo do header Content-Disposition ou usar padrão
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = 'relatorio_analise_educacional.md';
+                    
+                    if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                        if (filenameMatch) {
+                            filename = filenameMatch[1];
+                        }
+                    }
+                    
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    // Mostrar mensagem de sucesso
+                    const messagesEl = document.getElementById('messages');
+                    const successMsg = document.createElement('div');
+                    successMsg.className = 'bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-2';
+                    successMsg.innerHTML = `✅ Relatório baixado com sucesso: ${filename}`;
+                    messagesEl.insertBefore(successMsg, messagesEl.firstChild);
+                    
+                    setTimeout(() => {
+                        if (successMsg.parentNode) {
+                            successMsg.parentNode.removeChild(successMsg);
+                        }
+                    }, 5000);
+                    
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Erro ao baixar relatório');
+                }
+            } catch (error) {
+                alert('Erro ao baixar relatório: ' + error.message);
+            }
+        }
     </script>
 
     <!-- Footer -->
@@ -315,7 +367,7 @@
                 <div class="border-t border-gray-600 pt-4">
                     <p class="text-sm text-gray-400 leading-relaxed">
                         Sistema criado para análises detalhadas dos dados das Escolas<br>
-                        pela <strong class="text-white">Chefe de Departamento – Dirigente Regional de Ensino de Sertãozinho</strong><br>
+                        à pedido da <strong class="text-white">Chefe de Departamento – Dirigente Regional de Ensino de Sertãozinho</strong><br>
                         <strong class="text-white">Regina Aparecida Pieruchi</strong>
                     </p>
                 </div>
