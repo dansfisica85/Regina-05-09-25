@@ -10,6 +10,7 @@ from werkzeug.utils import secure_filename
 import tempfile
 from datetime import datetime
 import json
+from typing import List, Dict, Any, Tuple
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
@@ -23,6 +24,177 @@ ALLOWED_EXTENSIONS = {'xlsx', 'xls', 'csv'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# ============================= SUPORTE SAEB (ACRESCIMO) ============================= #
+def detectar_planilha_saeb(df: pd.DataFrame) -> bool:
+    """Heurística simples para detectar se a planilha segue o padrão 'APRENDIZAGEM - SAEB'
+    Observações da estrutura:
+    - Colunas todas como 'Unnamed'
+    - Linhas 1 a 3 contêm metadados: área (LÍNGUA PORTUGUESA / MATEMÁTICA), períodos (1ª QUINZENA ...), tipos (ENGAJAMENTO / ACERTOS)
+    - A partir de certa linha começam os nomes de escola em uma coluna com muitos valores de texto e ao lado valores percentuais
+    """
+    # Critérios: muitas colunas 'Unnamed' e presença de palavras-chave em qualquer célula
+    if not all(str(c).startswith('Unnamed') for c in df.columns):
+        return False
+    amostra_texto = ' '.join(str(v) for v in df.head(6).fillna('').values.flatten())
+    chaves = ['LÍNGUA', 'PORTUGUESA', 'MATEMÁTICA', 'QUINZENA', 'ENGAJAMENTO', 'ACERTOS']
+    return sum(1 for k in chaves if k.lower() in amostra_texto.lower()) >= 2
+
+def normalizar_valor_percentual(v: Any) -> float | None:
+    """Converte strings como '75,5 +' ou '70 -' em float (75.5, 70.0)."""
+    if pd.isna(v):
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    s = str(v).strip()
+    # Remover símbolos + - = e espaços finais
+    s = s.replace('+', '').replace('-', '').replace('=', '').strip()
+    # Trocar vírgula por ponto
+    s = s.replace(',', '.')
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+def extrair_bloco_saeb(df: pd.DataFrame) -> List[Dict[str, Any]]:
+    """Extrai dados estruturados da planilha SAEB.
+    Estratégia:
+    - Identificar linhas 'header' múltiplas (linhas 1-3 observadas) para montar hierarquia: Área -> Período -> Métrica (ENGAJAMENTO/ACERTOS)
+    - A partir da primeira linha onde aparece claramente um nome de escola (texto não genérico e valores numéricos ao lado) coletar registros.
+    - Para cada escola, percorrer pares de colunas (Engajamento, Acertos) por período e área.
+    Retorna lista de dicts com campos: Escola, Area, Periodo, Metrica, Valor
+    """
+    registros = []
+    if df.empty:
+        return registros
+
+    # Copiar para evitar SettingWithCopy warnings
+    dfx = df.copy()
+    # Preencher NaN com vazio para manipulação textual
+    dfx = dfx.fillna('')
+
+    # Capturar possíveis linhas de cabeçalho (primeiras 4 linhas)
+    header_rows = dfx.iloc[:4]
+    header_matrix = header_rows.values
+    n_cols = dfx.shape[1]
+
+    # Construir metadados por coluna: Área, Período, Tipo
+    areas = [''] * n_cols
+    periodos = [''] * n_cols
+    metricas = [''] * n_cols
+
+    for c in range(n_cols):
+        col_vals = [str(header_matrix[r][c]).strip() for r in range(len(header_rows))]
+        for val in col_vals:
+            vlow = val.lower()
+            if 'língua p' in vlow or 'portuguesa' in vlow:
+                areas[c] = 'Língua Portuguesa'
+            elif 'matemática' in vlow:
+                areas[c] = 'Matemática'
+            if 'quinzena' in vlow:
+                periodos[c] = val
+            if 'engajamento' in vlow:
+                metricas[c] = 'Engajamento'
+            elif 'acerto' in vlow:
+                metricas[c] = 'Acertos'
+
+    # Propagar valores para a direita onde vazio (forward fill manual)
+    for arr in (areas, periodos):
+        ultimo = ''
+        for i in range(n_cols):
+            if arr[i]:
+                ultimo = arr[i]
+            else:
+                arr[i] = ultimo
+
+    # Encontrar linha inicial de escolas: heurística texto não vazio em alguma coluna e ao menos um valor percentual nas colunas seguintes
+    linha_inicio = None
+    for i in range(4, len(dfx)):
+        row = dfx.iloc[i]
+        textos = [str(v).strip() for v in row.values]
+        # Candidato a nome de escola: string alfabética maior que 3 chars
+        for j, txt in enumerate(textos):
+            if len(txt) >= 4 and any(ch.isalpha() for ch in txt) and not txt.lower().startswith('unnamed'):
+                # Verificar se existe algum número nas próximas colunas
+                proximos = textos[j+1:j+6]
+                if any(any(d.isdigit() for d in p) for p in proximos):
+                    linha_inicio = i
+                    break
+        if linha_inicio is not None:
+            break
+
+    if linha_inicio is None:
+        return registros
+
+    # Assumir que a coluna j detectada é a coluna de escola -> encontrar melhor coluna escola: a com maior contagem de strings longas nas linhas de dados
+    candidatos = {}
+    dados_part = dfx.iloc[linha_inicio:]
+    for c in range(n_cols):
+        col_series = dados_part.iloc[:, c]
+        score = 0
+        for val in col_series.head(40):
+            sval = str(val).strip()
+            if len(sval) >= 4 and any(ch.isalpha() for ch in sval) and not sval.replace('.', '').isdigit():
+                score += 1
+        candidatos[c] = score
+    col_escola = max(candidatos, key=candidatos.get)
+
+    # Percorrer linhas de dados até encontrar linha vazia longa (mais de 80% vazia)
+    for idx in range(linha_inicio, len(dfx)):
+        row = dfx.iloc[idx]
+        valores = row.values
+        escola = str(valores[col_escola]).strip()
+        if not escola or escola.lower().startswith('unnamed'):
+            # Critério de parada: linha muito vazia
+            vazios = sum(1 for v in valores if (not str(v).strip()))
+            if vazios / n_cols > 0.8:
+                break
+            continue
+        # Para cada coluna de métricas coletar valor
+        for c in range(n_cols):
+            if c == col_escola:
+                continue
+            metrica = metricas[c]
+            if not metrica:
+                continue
+            area = areas[c] or 'Geral'
+            periodo = periodos[c] or 'Período'
+            valor_bruto = valores[c]
+            valor = normalizar_valor_percentual(valor_bruto)
+            if valor is not None:
+                registros.append({
+                    'Escola': escola,
+                    'Area': area,
+                    'Periodo': periodo,
+                    'Metrica': metrica,
+                    'Valor': valor
+                })
+    return registros
+
+def processar_planilha_saeb(df: pd.DataFrame, nome_planilha: str) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], str | None]:
+    """Processa planilha SAEB retornando:
+    - registros detalhados (lista granular)
+    - agregados por escola (média geral de todas as métricas)
+    - mensagem de status (ou None se ok)
+    Não altera as funções originais do sistema.
+    """
+    if not detectar_planilha_saeb(df):
+        return [], [], f"Planilha {nome_planilha} não reconhecida como formato SAEB"
+    registros = extrair_bloco_saeb(df)
+    if not registros:
+        return [], [], f"Nenhum dado estruturado extraído de {nome_planilha} (SAEB)"
+    # Agregar por escola para compatibilizar com fluxo existente
+    df_reg = pd.DataFrame(registros)
+    agregados = (
+        df_reg.groupby('Escola')['Valor']
+        .mean()
+        .reset_index()
+        .rename(columns={'Valor': 'Media'})
+    )
+    agregados['Planilha'] = nome_planilha
+    agregados['Valores_Utilizados'] = df_reg.groupby('Escola')['Valor'].count().values
+    return registros, agregados.to_dict(orient='records'), None
+# ============================= FIM SUPORTE SAEB ===================================== #
 
 def identificar_colunas_escola_e_dados(df):
     """
@@ -135,6 +307,38 @@ def criar_grafico_comparacao(dados_combinados):
     plt.close()
     
     return img_base64
+
+def criar_grafico_saeb(saeb_registros: List[Dict[str, Any]]) -> str | None:
+    """Cria heatmap de Engajamento/Acertos por Escola e Área agregando períodos.
+    Retorna base64 ou None se dados insuficientes."""
+    if not saeb_registros:
+        return None
+    df = pd.DataFrame(saeb_registros)
+    if df.empty:
+        return None
+    # Agregar média por Escola, Area, Metrica
+    pivot = (
+        df.groupby(['Escola', 'Area', 'Metrica'])['Valor']
+        .mean()
+        .reset_index()
+    )
+    # Criar matriz multi-métrica concatenando Area+Metrica
+    pivot['Chave'] = pivot['Area'] + ' - ' + pivot['Metrica']
+    mat = pivot.pivot(index='Escola', columns='Chave', values='Valor')
+    if mat.shape[0] < 2 or mat.shape[1] < 2:
+        return None
+    plt.figure(figsize=(max(8, mat.shape[1]*1.2), max(6, mat.shape[0]*0.4)))
+    sns.heatmap(mat, annot=True, fmt='.1f', cmap='Blues', cbar_kws={'label': 'Valor Médio'})
+    plt.title('SAEB - Engajamento e Acertos por Escola (Média dos Períodos)', fontsize=14, fontweight='bold')
+    plt.xlabel('Indicadores')
+    plt.ylabel('Escola')
+    plt.tight_layout()
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=300, bbox_inches='tight')
+    buf.seek(0)
+    b64 = base64.b64encode(buf.getvalue()).decode()
+    plt.close()
+    return b64
 
 def gerar_relatorio_markdown(dados_combinados, estatisticas, mensagens):
     """
@@ -258,6 +462,7 @@ def upload_files():
         todos_resultados = []
         mensagens = []
         
+        saeb_registros_detalhados = []  # manter registros SAEB para relatório futuro
         for file in files:
             if file and allowed_file(file.filename):
                 filename = secure_filename(file.filename)
@@ -268,14 +473,23 @@ def upload_files():
                 else:
                     df = pd.read_csv(file)
                 
-                # Processar planilha
-                resultados, erro = processar_planilha(df, filename)
-                
-                if erro:
-                    mensagens.append(erro)
+                # Primeiro tentar SAEB (adição)
+                saeb_detalhes, saeb_agregado, erro_saeb = processar_planilha_saeb(df, filename)
+                if saeb_agregado:  # se reconhecido como SAEB usar agregados
+                    todos_resultados.extend(saeb_agregado)
+                    saeb_registros_detalhados.extend(saeb_detalhes)
+                    mensagens.append(f"Arquivo {filename} (SAEB) processado - {len(saeb_agregado)} escolas")
                 else:
-                    todos_resultados.extend(resultados)
-                    mensagens.append(f"Arquivo {filename} processado com sucesso - {len(resultados)} escolas encontradas")
+                    # Fluxo original
+                    resultados, erro = processar_planilha(df, filename)
+                    if erro:
+                        # Se houve tentativa SAEB sem sucesso, juntar mensagens
+                        if erro_saeb and 'SAEB' in erro_saeb:
+                            mensagens.append(erro_saeb)
+                        mensagens.append(erro)
+                    else:
+                        todos_resultados.extend(resultados)
+                        mensagens.append(f"Arquivo {filename} processado com sucesso - {len(resultados)} escolas encontradas")
         
         if not todos_resultados:
             return jsonify({
@@ -283,8 +497,11 @@ def upload_files():
                 'mensagens': mensagens
             }), 400
         
-        # Criar gráfico
+        # Criar gráfico geral
         grafico_base64 = criar_grafico_comparacao(todos_resultados)
+        grafico_saeb = None
+        if session['dados_analise'].get('saeb_detalhado'):
+            grafico_saeb = criar_grafico_saeb(session['dados_analise']['saeb_detalhado'])
         
         # Calcular estatísticas
         df_resultados = pd.DataFrame(todos_resultados)
@@ -304,16 +521,20 @@ def upload_files():
             'dados': todos_resultados,
             'estatisticas': estatisticas,
             'mensagens': mensagens,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now().isoformat(),
+            'saeb_detalhado': saeb_registros_detalhados
         }
         
-        return jsonify({
+        retorno = {
             'success': True,
             'mensagens': mensagens,
             'dados': todos_resultados,
             'grafico': grafico_base64,
             'estatisticas': estatisticas
-        })
+        }
+        if grafico_saeb:
+            retorno['grafico_saeb'] = grafico_saeb
+        return jsonify(retorno)
         
     except Exception as e:
         return jsonify({'error': f'Erro no processamento: {str(e)}'}), 500
