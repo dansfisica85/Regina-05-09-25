@@ -1,6 +1,12 @@
-# Sistema de Análise Educacional - Regina
+# 📊 Análise Regina - Smart
 
-Sistema web para análise automatizada de planilhas educacionais (ALURA, LEIA, SPeak).
+## 🚀 Sistema Inteligente de Análise de Dados
+
+> **Plataforma revolucionária que transforma seus dados em insights valiosos usando Inteligência Artificial**
+
+![Badge](https://img.shields.io/badge/Regina-Smart-purple?style=for-the-badge&logo=chart-line)
+![Badge](https://img.shields.io/badge/IA-Integrada-blue?style=for-the-badge&logo=brain)
+![Badge](https://img.shields.io/badge/Interface-Moderna-green?style=for-the-badge&logo=react)
 
 ## � Novo: Suporte SAEB (Aprendizagem)
 
@@ -36,7 +42,7 @@ Se precisar de exportação detalhada (todas as quinzenas e métricas em tabela)
 ### Opção 1: Deploy via Dashboard Vercel (Recomendado)
 
 1. **Acesse o Vercel Dashboard**
-   - Vá para https://vercel.com/dashboard
+   - Vá para <https://vercel.com/dashboard>
    - Faça login na sua conta
 
 2. **Conectar Repositório**
@@ -56,16 +62,19 @@ Se precisar de exportação detalhada (todas as quinzenas e métricas em tabela)
 ### Opção 2: Deploy via CLI
 
 1. **Instalar Vercel CLI**
+
    ```bash
    npm i -g vercel
    ```
 
 2. **Login no Vercel**
+
    ```bash
    vercel login
    ```
 
 3. **Deploy do Projeto**
+
    ```bash
    # Na pasta do projeto
    vercel --prod
@@ -114,6 +123,7 @@ O projeto já está configurado com:
 ### 🔍 Detecção Automática
 
 O sistema identifica automaticamente:
+
 - Colunas de escolas (nome, unidade, instituição)
 - Colunas de dados (ALURA, BIM, médias, notas)
 - Converte dados para formato numérico
@@ -122,6 +132,7 @@ O sistema identifica automaticamente:
 ### 📞 Suporte
 
 Em caso de problemas:
+
 1. Verifique se os arquivos estão no formato correto
 2. Confirme se as colunas têm nomes descritivos
 3. Verifique se há dados numéricos válidos nas planilhas
@@ -129,5 +140,6 @@ Em caso de problemas:
 ### 🔄 Atualizações
 
 Para atualizar o sistema:
+
 1. Faça push das alterações para o repositório
 2. O Vercel fará deploy automático das mudanças

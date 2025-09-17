@@ -3,24 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Analytics - Sistema Avançado de Análise</title>
+    <title>Análise Regina - Smart | Sistema Inteligente de Dados</title>
     
     <!-- CSS -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.0/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <!-- Scripts -->
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     
     <style>
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .social-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .brand-title {
+            background: linear-gradient(135deg, #fff 0%, #f8fafc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .smart-badge {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        
+        .social-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .social-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+        }
+        
         .loading-spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
+            border: 3px solid rgba(102, 126, 234, 0.3);
+            border-top: 3px solid #667eea;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 2s linear infinite;
+            width: 36px;
+            height: 36px;
+            animation: spin 1s linear infinite;
         }
         
         @keyframes spin {
@@ -30,59 +93,184 @@
         
         .drag-drop-area {
             border: 2px dashed #cbd5e0;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-radius: 16px;
             transition: all 0.3s ease;
         }
         
         .drag-drop-area.dragover {
-            border-color: #4299e1;
-            background-color: #ebf8ff;
+            border-color: #667eea;
+            background: linear-gradient(135deg, #ede9fe 0%, #e0e7ff 100%);
+            transform: scale(1.02);
         }
         
         .insight-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            border-left: 4px solid #667eea;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
             transition: all 0.3s ease;
         }
         
         .insight-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+            border-left-color: #ff6b6b;
         }
         
         .chart-container {
             min-height: 400px;
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
         }
         
         .sidebar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
             transition: all 0.3s ease;
+            border-radius: 0 20px 20px 0;
         }
         
         .sidebar.collapsed {
-            margin-left: -300px;
+            margin-left: -320px;
         }
+        
+        .social-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 12px 20px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .social-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .social-button:disabled {
+            background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .metric-card {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid rgba(102, 126, 234, 0.1);
+        }
+        
+        .tab-button {
+            color: #6b7280;
+            border-bottom: 2px solid transparent;
+            padding: 12px 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .tab-button.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            border-radius: 8px 8px 0 0;
+        }
+        
+        .floating-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            animation: pulse 2s infinite;
+            display: inline-block;
+        }
+        
+        .welcome-hero {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.9) 100%);
+            border-radius: 24px;
+            padding: 60px 40px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(20px);
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-top: 40px;
+        }
+        
+        .feature-card {
+            background: white;
+            border-radius: 16px;
+            padding: 32px 24px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            border: 1px solid rgba(102, 126, 234, 0.1);
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
     </style>
 </head>
 
-<body class="bg-gray-50 min-h-screen" x-data="smartAnalytics()">
+<body class="min-h-screen" x-data="smartAnalytics()">
     <!-- Header -->
-    <header class="bg-white shadow-sm border-b">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center py-4">
-                <div class="flex items-center space-x-4">
-                    <button @click="sidebarOpen = !sidebarOpen" class="text-gray-500 hover:text-gray-700" title="Toggle Sidebar">
+    <header class="header-gradient shadow-lg">
+        <div class="max-w-7xl mx-auto px-6 lg:px-8">
+            <div class="flex justify-between items-center py-6">
+                <div class="flex items-center space-x-6">
+                    <button @click="sidebarOpen = !sidebarOpen" 
+                            class="text-white hover:text-gray-200 transition-colors duration-200" 
+                            title="Toggle Sidebar">
                         <i class="fas fa-bars text-xl"></i>
                     </button>
-                    <h1 class="text-2xl font-bold text-gray-900">
-                        <i class="fas fa-brain text-blue-600 mr-2"></i>
-                        Smart Analytics
-                    </h1>
+                    
+                    <div class="flex items-center space-x-3">
+                        <div class="relative">
+                            <i class="fas fa-chart-line text-white text-3xl"></i>
+                            <div class="status-indicator absolute -top-1 -right-1"></div>
+                        </div>
+                        
+                        <div>
+                            <h1 class="brand-title text-3xl">
+                                Análise Regina
+                                <span class="smart-badge ml-2">Smart</span>
+                            </h1>
+                            <p class="text-white opacity-80 text-sm font-medium">
+                                Sistema Inteligente de Análise de Dados
+                            </p>
+                        </div>
+                    </div>
                 </div>
                 
-                <div class="flex items-center space-x-4">
-                    <div class="text-sm text-gray-500" x-show="dataLoaded">
-                        <i class="fas fa-database mr-1"></i>
-                        <span x-text="metadata.rows + ' linhas, ' + metadata.columns + ' colunas'"></span>
+                <div class="flex items-center space-x-6">
+                    <div class="text-white opacity-90" x-show="dataLoaded">
+                        <div class="flex items-center space-x-2 bg-white bg-opacity-20 rounded-full px-4 py-2">
+                            <i class="fas fa-database"></i>
+                            <span class="text-sm font-medium" x-text="metadata.rows + ' linhas, ' + metadata.columns + ' colunas'"></span>
+                        </div>
                     </div>
                     
-                    <button @click="showHelp = true" class="text-gray-500 hover:text-gray-700" title="Ajuda">
+                    <button @click="showHelp = true" 
+                            class="text-white hover:text-gray-200 transition-colors duration-200" 
+                            title="Ajuda">
                         <i class="fas fa-question-circle text-xl"></i>
                     </button>
                 </div>
@@ -90,27 +278,32 @@
         </div>
     </header>
 
-    <div class="flex h-screen pt-16">
+    <div class="flex h-screen pt-20 p-6 gap-6">
         <!-- Sidebar -->
-        <div class="sidebar fixed left-0 top-16 h-full w-80 bg-white shadow-lg z-40 overflow-y-auto" 
+        <div class="sidebar fixed left-6 top-24 h-[calc(100vh-7rem)] w-80 shadow-2xl z-40 overflow-y-auto" 
              :class="{ 'collapsed': !sidebarOpen }">
             
             <div class="p-6">
                 <!-- Upload Section -->
-                <div class="mb-8">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">
-                        <i class="fas fa-upload mr-2"></i>Carregar Dados
+                <div class="social-card mb-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                        <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mr-3">
+                            <i class="fas fa-upload text-white text-sm"></i>
+                        </div>
+                        Carregar Dados
                     </h3>
                     
-                    <div class="drag-drop-area rounded-lg p-6 text-center border-2 border-dashed"
+                    <div class="drag-drop-area p-8 text-center"
                          @drop.prevent="handleFileDrop($event)"
                          @dragover.prevent="$event.target.classList.add('dragover')"
                          @dragleave.prevent="$event.target.classList.remove('dragover')">
                         
                         <div x-show="!loading">
-                            <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-3"></i>
-                            <p class="text-gray-600 mb-2">Arraste arquivos aqui</p>
-                            <p class="text-sm text-gray-500 mb-4">ou</p>
+                            <div class="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i class="fas fa-cloud-upload-alt text-white text-2xl"></i>
+                            </div>
+                            <p class="text-gray-700 font-medium mb-2">Arraste seus arquivos aqui</p>
+                            <p class="text-sm text-gray-500 mb-6">Suporte a Excel, CSV, JSON</p>
                             
                             <input type="file" id="fileInput" multiple 
                                    accept=".xlsx,.xls,.csv,.json" 
@@ -119,69 +312,86 @@
                                    title="Selecionar arquivos para upload">
                             
                             <button onclick="document.getElementById('fileInput').click()" 
-                                    class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
+                                    class="social-button w-full">
+                                <i class="fas fa-plus mr-2"></i>
                                 Selecionar Arquivos
                             </button>
                         </div>
                         
                         <div x-show="loading" class="flex flex-col items-center">
-                            <div class="loading-spinner mb-3"></div>
-                            <p class="text-gray-600">Processando...</p>
+                            <div class="loading-spinner mb-4"></div>
+                            <p class="text-gray-600 font-medium">Analisando dados...</p>
                         </div>
                     </div>
                     
                     <!-- URL Input -->
-                    <div class="mt-4">
+                    <div class="mt-6 pt-6 border-t border-gray-200">
                         <input type="url" x-model="googleSheetsUrl" 
-                               placeholder="URL do Google Sheets (público)"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                               placeholder="🔗 URL do Google Sheets (público)"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                         
                         <button @click="loadFromUrl()" 
                                 :disabled="!googleSheetsUrl || loading"
-                                class="w-full mt-2 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition-colors">
-                            <i class="fab fa-google mr-2"></i>Carregar do Google Sheets
+                                class="w-full mt-3 social-button disabled:opacity-50">
+                            <i class="fab fa-google mr-2"></i>Conectar Google Sheets
                         </button>
                     </div>
                 </div>
 
                 <!-- Data Overview -->
-                <div x-show="dataLoaded" class="mb-8">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">
-                        <i class="fas fa-info-circle mr-2"></i>Visão Geral
+                <div x-show="dataLoaded" class="social-card mb-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                        <div class="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center mr-3">
+                            <i class="fas fa-chart-bar text-white text-sm"></i>
+                        </div>
+                        Dashboard de Dados
                     </h3>
                     
-                    <div class="space-y-3">
-                        <div class="bg-blue-50 p-3 rounded-lg">
-                            <div class="text-sm font-medium text-blue-800">Qualidade dos Dados</div>
-                            <div class="text-lg font-bold text-blue-600" x-text="(dataQualityScore * 100).toFixed(1) + '%'"></div>
+                    <div class="grid grid-cols-1 gap-4">
+                        <div class="metric-card">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-sm font-medium text-gray-600">Qualidade dos Dados</div>
+                                    <div class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent" 
+                                         x-text="(dataQualityScore * 100).toFixed(1) + '%'"></div>
+                                </div>
+                                <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-check text-white"></i>
+                                </div>
+                            </div>
                         </div>
                         
-                        <div class="bg-green-50 p-3 rounded-lg">
-                            <div class="text-sm font-medium text-green-800">Colunas Numéricas</div>
-                            <div class="text-lg font-bold text-green-600" x-text="numericColumns"></div>
-                        </div>
-                        
-                        <div class="bg-purple-50 p-3 rounded-lg">
-                            <div class="text-sm font-medium text-purple-800">Colunas Categóricas</div>
-                            <div class="text-lg font-bold text-purple-600" x-text="categoricalColumns"></div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="metric-card text-center">
+                                <div class="text-xl font-bold text-green-600" x-text="numericColumns"></div>
+                                <div class="text-xs text-gray-500">Numéricas</div>
+                            </div>
+                            
+                            <div class="metric-card text-center">
+                                <div class="text-xl font-bold text-purple-600" x-text="categoricalColumns"></div>
+                                <div class="text-xs text-gray-500">Categóricas</div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Quick Actions -->
-                <div x-show="dataLoaded" class="mb-8">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">
-                        <i class="fas fa-bolt mr-2"></i>Ações Rápidas
+                <div x-show="dataLoaded" class="social-card mb-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                        <div class="w-8 h-8 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full flex items-center justify-center mr-3">
+                            <i class="fas fa-bolt text-white text-sm"></i>
+                        </div>
+                        Ações Inteligentes
                     </h3>
                     
-                    <div class="space-y-2">
+                    <div class="space-y-3">
                         <button @click="generateDashboard()" 
-                                class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
+                                class="w-full social-button flex items-center justify-center">
                             <i class="fas fa-chart-pie mr-2"></i>Dashboard Automático
                         </button>
                         
                         <button @click="showInsights()" 
-                                class="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors">
+                                class="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white border-none border-radius-12 padding-12-20 font-weight-600 transition-all hover:transform hover:translateY(-2px) hover:shadow-lg flex items-center justify-center">
                             <i class="fas fa-lightbulb mr-2"></i>Ver Insights
                         </button>
                         
@@ -220,70 +430,89 @@
         </div>
 
         <!-- Main Content -->
-        <main class="flex-1 overflow-y-auto transition-all duration-300"
-              :class="{ 'ml-80': sidebarOpen, 'ml-0': !sidebarOpen }">
+        <main class="flex-1 overflow-y-auto transition-all duration-300 ml-0"
+              :class="{ 'ml-80': sidebarOpen }">
             
-            <div class="p-6">
+            <div class="container mx-auto max-w-7xl px-6">
                 <!-- Welcome Screen -->
-                <div x-show="!dataLoaded" class="text-center py-20">
-                    <div class="max-w-2xl mx-auto">
-                        <i class="fas fa-brain text-6xl text-blue-500 mb-6"></i>
-                        <h2 class="text-3xl font-bold text-gray-800 mb-4">
-                            Bem-vindo ao Smart Analytics
-                        </h2>
-                        <p class="text-lg text-gray-600 mb-8">
-                            Sistema avançado de análise de dados com inteligência artificial para 
-                            interpretação automática de planilhas e geração de insights.
+                <div x-show="!dataLoaded" class="welcome-hero">
+                    <div class="max-w-4xl mx-auto">
+                        <div class="flex items-center justify-center mb-8">
+                            <div class="w-20 h-20 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mr-4">
+                                <i class="fas fa-brain text-white text-3xl"></i>
+                            </div>
+                            <div class="text-left">
+                                <h2 class="text-4xl font-bold text-gray-800 mb-2">
+                                    Bem-vindo ao 
+                                    <span class="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                                        Análise Regina - Smart
+                                    </span>
+                                </h2>
+                                <p class="text-lg text-gray-600">
+                                    Transforme seus dados em insights valiosos com IA
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <p class="text-xl text-gray-700 mb-12 leading-relaxed">
+                            Plataforma inteligente que analisa automaticamente suas planilhas e descobre 
+                            padrões ocultos, gera visualizações interativas e fornece insights acionáveis.
                         </p>
                         
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
-                            <div class="bg-white p-6 rounded-lg shadow-sm">
-                                <i class="fas fa-upload text-3xl text-blue-500 mb-4"></i>
-                                <h3 class="font-semibold text-gray-800 mb-2">Upload Inteligente</h3>
-                                <p class="text-gray-600 text-sm">Suporte a Excel, CSV, Google Sheets com detecção automática de formato</p>
+                        <div class="feature-grid">
+                            <div class="feature-card">
+                                <div class="w-16 h-16 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <i class="fas fa-upload text-white text-2xl"></i>
+                                </div>
+                                <h3 class="font-bold text-gray-800 mb-3 text-lg">Upload Inteligente</h3>
+                                <p class="text-gray-600 leading-relaxed">Suporte completo a Excel, CSV, Google Sheets com detecção automática de formato e estrutura</p>
                             </div>
                             
-                            <div class="bg-white p-6 rounded-lg shadow-sm">
-                                <i class="fas fa-robot text-3xl text-green-500 mb-4"></i>
-                                <h3 class="font-semibold text-gray-800 mb-2">IA Integrada</h3>
-                                <p class="text-gray-600 text-sm">Machine learning para interpretação automática e insights inteligentes</p>
+                            <div class="feature-card">
+                                <div class="w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <i class="fas fa-robot text-white text-2xl"></i>
+                                </div>
+                                <h3 class="font-bold text-gray-800 mb-3 text-lg">IA Integrada</h3>
+                                <p class="text-gray-600 leading-relaxed">Machine learning para interpretação automática de dados e geração de insights inteligentes</p>
                             </div>
                             
-                            <div class="bg-white p-6 rounded-lg shadow-sm">
-                                <i class="fas fa-chart-line text-3xl text-purple-500 mb-4"></i>
-                                <h3 class="font-semibold text-gray-800 mb-2">Visualizações Avançadas</h3>
-                                <p class="text-gray-600 text-sm">Gráficos interativos e dashboards personalizáveis</p>
+                            <div class="feature-card">
+                                <div class="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <i class="fas fa-chart-line text-white text-2xl"></i>
+                                </div>
+                                <h3 class="font-bold text-gray-800 mb-3 text-lg">Visualizações Avançadas</h3>
+                                <p class="text-gray-600 leading-relaxed">Gráficos interativos e dashboards personalizáveis com tecnologia Plotly</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Main Dashboard -->
-                <div x-show="dataLoaded">
+                <div x-show="dataLoaded" class="social-container p-8">
                     <!-- Tabs -->
-                    <div class="mb-6">
-                        <nav class="flex space-x-8 border-b border-gray-200">
+                    <div class="mb-8">
+                        <nav class="flex space-x-2 bg-gray-100 rounded-xl p-2">
                             <button @click="activeTab = 'dashboard'" 
-                                    :class="{ 'border-blue-500 text-blue-600': activeTab === 'dashboard', 'border-transparent text-gray-500': activeTab !== 'dashboard' }"
-                                    class="py-2 px-1 border-b-2 font-medium text-sm hover:text-gray-700">
+                                    :class="activeTab === 'dashboard' ? 'tab-button active' : 'tab-button'"
+                                    class="flex-1 text-center">
                                 <i class="fas fa-chart-pie mr-2"></i>Dashboard
                             </button>
                             
                             <button @click="activeTab = 'insights'" 
-                                    :class="{ 'border-blue-500 text-blue-600': activeTab === 'insights', 'border-transparent text-gray-500': activeTab !== 'insights' }"
-                                    class="py-2 px-1 border-b-2 font-medium text-sm hover:text-gray-700">
+                                    :class="activeTab === 'insights' ? 'tab-button active' : 'tab-button'"
+                                    class="flex-1 text-center">
                                 <i class="fas fa-lightbulb mr-2"></i>Insights
                             </button>
                             
                             <button @click="activeTab = 'statistics'" 
-                                    :class="{ 'border-blue-500 text-blue-600': activeTab === 'statistics', 'border-transparent text-gray-500': activeTab !== 'statistics' }"
-                                    class="py-2 px-1 border-b-2 font-medium text-sm hover:text-gray-700">
+                                    :class="activeTab === 'statistics' ? 'tab-button active' : 'tab-button'"
+                                    class="flex-1 text-center">
                                 <i class="fas fa-calculator mr-2"></i>Estatísticas
                             </button>
                             
                             <button @click="activeTab = 'data'" 
-                                    :class="{ 'border-blue-500 text-blue-600': activeTab === 'data', 'border-transparent text-gray-500': activeTab !== 'data' }"
-                                    class="py-2 px-1 border-b-2 font-medium text-sm hover:text-gray-700">
+                                    :class="activeTab === 'data' ? 'tab-button active' : 'tab-button'"
+                                    class="flex-1 text-center">
                                 <i class="fas fa-table mr-2"></i>Dados
                             </button>
                         </nav>
@@ -291,13 +520,14 @@
 
                     <!-- Dashboard Tab -->
                     <div x-show="activeTab === 'dashboard'">
-                        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
                             <template x-for="(chart, index) in dashboardCharts" :key="index">
-                                <div class="bg-white rounded-lg shadow-sm p-6">
-                                    <div class="flex justify-between items-center mb-4">
-                                        <h3 class="text-lg font-semibold text-gray-800" x-text="chart.title"></h3>
-                                        <button @click="expandChart(chart)" class="text-gray-500 hover:text-gray-700">
-                                            <i class="fas fa-expand"></i>
+                                <div class="floating-card p-8">
+                                    <div class="flex justify-between items-center mb-6">
+                                        <h3 class="text-xl font-bold text-gray-800" x-text="chart.title"></h3>
+                                        <button @click="expandChart(chart)" 
+                                                class="w-10 h-10 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors">
+                                            <i class="fas fa-expand text-gray-600"></i>
                                         </button>
                                     </div>
                                     <div :id="'chart-' + index" class="chart-container"></div>
@@ -305,9 +535,16 @@
                             </template>
                         </div>
                         
-                        <div x-show="dashboardCharts.length === 0" class="text-center py-12">
-                            <i class="fas fa-chart-bar text-4xl text-gray-400 mb-4"></i>
-                            <p class="text-gray-600">Clique em "Dashboard Automático" para gerar visualizações</p>
+                        <div x-show="dashboardCharts.length === 0" class="text-center py-20">
+                            <div class="w-24 h-24 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto mb-6">
+                                <i class="fas fa-chart-bar text-3xl text-gray-500"></i>
+                            </div>
+                            <h3 class="text-2xl font-bold text-gray-700 mb-4">Seu Dashboard Está Aguardando</h3>
+                            <p class="text-gray-600 mb-8">Clique em "Dashboard Automático" na barra lateral para gerar visualizações inteligentes</p>
+                            <div class="inline-flex items-center space-x-2 text-purple-600">
+                                <i class="fas fa-arrow-left"></i>
+                                <span class="font-medium">Comece aqui</span>
+                            </div>
                         </div>
                     </div>
 
@@ -315,29 +552,29 @@
                     <div x-show="activeTab === 'insights'">
                         <div class="space-y-6">
                             <template x-for="(insight, index) in insights" :key="index">
-                                <div class="insight-card bg-white rounded-lg shadow-sm p-6">
+                                <div class="insight-card">
                                     <div class="flex items-start space-x-4">
                                         <div class="flex-shrink-0">
-                                            <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                                <i class="fas fa-lightbulb text-blue-600"></i>
+                                            <div class="w-12 h-12 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
+                                                <i class="fas fa-lightbulb text-white"></i>
                                             </div>
                                         </div>
                                         
                                         <div class="flex-1">
-                                            <h3 class="text-lg font-semibold text-gray-800 mb-2" x-text="insight.title"></h3>
-                                            <p class="text-gray-600 mb-3" x-text="insight.description"></p>
+                                            <h3 class="text-xl font-bold text-gray-800 mb-3" x-text="insight.title"></h3>
+                                            <p class="text-gray-600 mb-4 leading-relaxed" x-text="insight.description"></p>
                                             
-                                            <div x-show="insight.recommendation" class="bg-blue-50 p-3 rounded-lg">
-                                                <p class="text-sm text-blue-800">
-                                                    <i class="fas fa-info-circle mr-1"></i>
+                                            <div x-show="insight.recommendation" class="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-xl border border-blue-200">
+                                                <p class="text-blue-800 font-medium">
+                                                    <i class="fas fa-info-circle mr-2"></i>
                                                     <span x-text="insight.recommendation"></span>
                                                 </p>
                                             </div>
                                             
-                                            <div class="flex justify-between items-center mt-4">
-                                                <span class="text-xs text-gray-500" x-text="insight.category"></span>
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">Importância:</span>
+                                            <div class="flex justify-between items-center mt-6">
+                                                <span class="px-3 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600" x-text="insight.category"></span>
+                                                <div class="flex items-center space-x-2">
+                                                    <span class="text-sm text-gray-500">Relevância:</span>
                                                     <div class="flex space-x-1">
                                                         <template x-for="i in 5" :key="i">
                                                             <div class="w-2 h-2 rounded-full" 
@@ -668,20 +905,52 @@
                     this.showNotification('Funcionalidade em desenvolvimento', 'info');
                 },
                 
-                showNotification(message, type) {
-                    // Sistema simples de notificação
+                showNotification(message, type = 'success') {
+                    // Sistema moderno de notificação estilo rede social
                     const notification = document.createElement('div');
-                    notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
-                        type === 'success' ? 'bg-green-500 text-white' :
-                        type === 'error' ? 'bg-red-500 text-white' :
-                        'bg-blue-500 text-white'
-                    }`;
-                    notification.textContent = message;
+                    notification.className = 'notification-toast';
+                    
+                    // Ícone baseado no tipo
+                    const icon = type === 'success' ? 'fas fa-check-circle text-green-500' :
+                                type === 'error' ? 'fas fa-exclamation-circle text-red-500' :
+                                'fas fa-info-circle text-blue-500';
+                    
+                    // Cor da borda baseada no tipo
+                    const borderColor = type === 'success' ? '#10b981' :
+                                       type === 'error' ? '#ef4444' :
+                                       '#3b82f6';
+                    
+                    notification.style.borderLeftColor = borderColor;
+                    
+                    notification.innerHTML = `
+                        <div class="flex items-center space-x-3">
+                            <i class="${icon}"></i>
+                            <div>
+                                <p class="font-medium text-gray-800">${message}</p>
+                                <p class="text-xs text-gray-500">${new Date().toLocaleTimeString()}</p>
+                            </div>
+                            <button onclick="this.parentElement.parentElement.remove()" 
+                                    class="text-gray-400 hover:text-gray-600">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    `;
                     
                     document.body.appendChild(notification);
                     
+                    // Animação de entrada
+                    notification.style.transform = 'translateX(100%)';
+                    notification.style.transition = 'transform 0.3s ease';
                     setTimeout(() => {
-                        notification.remove();
+                        notification.style.transform = 'translateX(0)';
+                    }, 10);
+                    
+                    // Auto-remover após 5 segundos
+                    setTimeout(() => {
+                        if (notification.parentElement) {
+                            notification.style.transform = 'translateX(100%)';
+                            setTimeout(() => notification.remove(), 300);
+                        }
                     }, 5000);
                 }
             }
