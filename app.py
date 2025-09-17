@@ -497,11 +497,9 @@ def upload_files():
                 'mensagens': mensagens
             }), 400
         
-        # Criar gráfico geral
+        # Criar gráficos (usar registros em memória; só depois salvar na sessão)
         grafico_base64 = criar_grafico_comparacao(todos_resultados)
-        grafico_saeb = None
-        if session['dados_analise'].get('saeb_detalhado'):
-            grafico_saeb = criar_grafico_saeb(session['dados_analise']['saeb_detalhado'])
+        grafico_saeb = criar_grafico_saeb(saeb_registros_detalhados) if saeb_registros_detalhados else None
         
         # Calcular estatísticas
         df_resultados = pd.DataFrame(todos_resultados)
@@ -517,12 +515,18 @@ def upload_files():
             }
         
         # Salvar dados na sessão para download posterior
+        # Armazenar somente dados essenciais na sessão para não ultrapassar limite de cookie
+        sess_dados = todos_resultados
+        # Para SAEB guardar apenas contagem e não todos registros detalhados (que podem ser muitos)
+        info_saeb = {
+            'total_registros': len(saeb_registros_detalhados)
+        } if saeb_registros_detalhados else {}
         session['dados_analise'] = {
-            'dados': todos_resultados,
+            'dados': sess_dados,
             'estatisticas': estatisticas,
             'mensagens': mensagens,
             'timestamp': datetime.now().isoformat(),
-            'saeb_detalhado': saeb_registros_detalhados
+            'saeb_info': info_saeb
         }
         
         retorno = {

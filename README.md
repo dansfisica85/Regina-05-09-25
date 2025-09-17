@@ -2,7 +2,29 @@
 
 Sistema web para análise automatizada de planilhas educacionais (ALURA, LEIA, SPeak).
 
-## 🚀 Deploy no Vercel
+## � Novo: Suporte SAEB (Aprendizagem)
+
+Agora o sistema também processa automaticamente planilhas no modelo "APRENDIZAGEM - SAEB.xlsx" (formato consolidado com múltiplas linhas de cabeçalho e colunas sem nomes). O parser:
+
+- Detecta o layout caracterizado por colunas "Unnamed" e cabeçalhos distribuídos em várias linhas (Área, Quinzena, Métrica).
+- Extrai métricas de Engajamento e Acertos por Escola, Área (Língua Portuguesa / Matemática) e Períodos (Quinzenas).
+- Normaliza valores percentuais mesmo com símbolos (+, -, =) e vírgulas.
+- Calcula médias agregadas por escola para integrar ao fluxo existente sem modificar as funções originais.
+- Gera um heatmap adicional (Engajamento / Acertos por Área) exibido automaticamente quando uma planilha SAEB é enviada.
+
+### Como usar com SAEB
+1. Inclua o arquivo no upload normal (não é necessário renomear).
+2. O sistema identifica o formato e mostra mensagem: `(SAEB) processado`.
+3. Um segundo gráfico (heatmap) aparecerá abaixo do gráfico de comparação geral.
+4. O relatório Markdown inclui as médias agregadas por escola (o detalhamento período a período é utilizado apenas para gerar o heatmap e otimizar tamanho de sessão).
+
+### Limitações atuais SAEB
+- O relatório não lista cada quinzena separadamente (focado em média agregada por Escola/Área/Métrica).
+- Se a estrutura for alterada (ex.: remoção de linhas de cabeçalho), a detecção pode falhar.
+
+Se precisar de exportação detalhada (todas as quinzenas e métricas em tabela), abrir uma issue pedindo "Export detalhado SAEB".
+
+## �🚀 Deploy no Vercel
 
 ### Pré-requisitos
 - Conta no Vercel (https://vercel.com)
