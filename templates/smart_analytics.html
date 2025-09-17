@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Analytics - Sistema Avançado de Análise</title>
+    
+    <!-- CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.0/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Scripts -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    
+    <style>
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .drag-drop-area {
+            border: 2px dashed #cbd5e0;
+            transition: all 0.3s ease;
+        }
+        
+        .drag-drop-area.dragover {
+            border-color: #4299e1;
+            background-color: #ebf8ff;
+        }
+        
+        .insight-card {
+            transition: all 0.3s ease;
+        }
+        
+        .insight-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        
+        .chart-container {
+            min-height: 400px;
+        }
+        
+        .sidebar {
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar.collapsed {
+            margin-left: -300px;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 min-h-screen" x-data="smartAnalytics()">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-4">
+                    <button @click="sidebarOpen = !sidebarOpen" class="text-gray-500 hover:text-gray-700" title="Toggle Sidebar">
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
+                    <h1 class="text-2xl font-bold text-gray-900">
+                        <i class="fas fa-brain text-blue-600 mr-2"></i>
+                        Smart Analytics
+                    </h1>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <div class="text-sm text-gray-500" x-show="dataLoaded">
+                        <i class="fas fa-database mr-1"></i>
+                        <span x-text="metadata.rows + ' linhas, ' + metadata.columns + ' colunas'"></span>
+                    </div>
+                    
+                    <button @click="showHelp = true" class="text-gray-500 hover:text-gray-700" title="Ajuda">
+                        <i class="fas fa-question-circle text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex h-screen pt-16">
+        <!-- Sidebar -->
+        <div class="sidebar fixed left-0 top-16 h-full w-80 bg-white shadow-lg z-40 overflow-y-auto" 
+             :class="{ 'collapsed': !sidebarOpen }">
+            
+            <div class="p-6">
+                <!-- Upload Section -->
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                        <i class="fas fa-upload mr-2"></i>Carregar Dados
+                    </h3>
+                    
+                    <div class="drag-drop-area rounded-lg p-6 text-center border-2 border-dashed"
+                         @drop.prevent="handleFileDrop($event)"
+                         @dragover.prevent="$event.target.classList.add('dragover')"
+                         @dragleave.prevent="$event.target.classList.remove('dragover')">
+                        
+                        <div x-show="!loading">
+                            <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-3"></i>
+                            <p class="text-gray-600 mb-2">Arraste arquivos aqui</p>
+                            <p class="text-sm text-gray-500 mb-4">ou</p>
+                            
+                            <input type="file" id="fileInput" multiple 
+                                   accept=".xlsx,.xls,.csv,.json" 
+                                   @change="handleFileSelect($event)"
+                                   class="hidden"
+                                   title="Selecionar arquivos para upload">
+                            
+                            <button onclick="document.getElementById('fileInput').click()" 
+                                    class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
+                                Selecionar Arquivos
+                            </button>
+                        </div>
+                        
+                        <div x-show="loading" class="flex flex-col items-center">
+                            <div class="loading-spinner mb-3"></div>
+                            <p class="text-gray-600">Processando...</p>
+                        </div>
+                    </div>
+                    
+                    <!-- URL Input -->
+                    <div class="mt-4">
+                        <input type="url" x-model="googleSheetsUrl" 
+                               placeholder="URL do Google Sheets (público)"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        
+                        <button @click="loadFromUrl()" 
+                                :disabled="!googleSheetsUrl || loading"
+                                class="w-full mt-2 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition-colors">
+                            <i class="fab fa-google mr-2"></i>Carregar do Google Sheets
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Data Overview -->
+                <div x-show="dataLoaded" class="mb-8">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                        <i class="fas fa-info-circle mr-2"></i>Visão Geral
+                    </h3>
+                    
+                    <div class="space-y-3">
+                        <div class="bg-blue-50 p-3 rounded-lg">
+                            <div class="text-sm font-medium text-blue-800">Qualidade dos Dados</div>
+                            <div class="text-lg font-bold text-blue-600" x-text="(dataQualityScore * 100).toFixed(1) + '%'"></div>
+                        </div>
+                        
+                        <div class="bg-green-50 p-3 rounded-lg">
+                            <div class="text-sm font-medium text-green-800">Colunas Numéricas</div>
+                            <div class="text-lg font-bold text-green-600" x-text="numericColumns"></div>
+                        </div>
+                        
+                        <div class="bg-purple-50 p-3 rounded-lg">
+                            <div class="text-sm font-medium text-purple-800">Colunas Categóricas</div>
+                            <div class="text-lg font-bold text-purple-600" x-text="categoricalColumns"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div x-show="dataLoaded" class="mb-8">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                        <i class="fas fa-bolt mr-2"></i>Ações Rápidas
+                    </h3>
+                    
+                    <div class="space-y-2">
+                        <button @click="generateDashboard()" 
+                                class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
+                            <i class="fas fa-chart-pie mr-2"></i>Dashboard Automático
+                        </button>
+                        
+                        <button @click="showInsights()" 
+                                class="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors">
+                            <i class="fas fa-lightbulb mr-2"></i>Ver Insights
+                        </button>
+                        
+                        <button @click="showStatistics()" 
+                                class="w-full bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors">
+                            <i class="fas fa-calculator mr-2"></i>Análise Estatística
+                        </button>
+                        
+                        <button @click="exportAnalysis()" 
+                                class="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg transition-colors">
+                            <i class="fas fa-download mr-2"></i>Exportar Relatório
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Chart Recommendations -->
+                <div x-show="dataLoaded && chartRecommendations.length > 0" class="mb-8">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                        <i class="fas fa-chart-bar mr-2"></i>Gráficos Recomendados
+                    </h3>
+                    
+                    <div class="space-y-2">
+                        <template x-for="(rec, index) in chartRecommendations.slice(0, 5)" :key="index">
+                            <button @click="createVisualization(rec)" 
+                                    class="w-full text-left p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
+                                <div class="font-medium text-gray-800" x-text="rec.title"></div>
+                                <div class="text-sm text-gray-600" x-text="rec.chart_type"></div>
+                                <div class="text-xs text-green-600 mt-1">
+                                    Relevância: <span x-text="(rec.relevance_score * 100).toFixed(0) + '%'"></span>
+                                </div>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto transition-all duration-300"
+              :class="{ 'ml-80': sidebarOpen, 'ml-0': !sidebarOpen }">
+            
+            <div class="p-6">
+                <!-- Welcome Screen -->
+                <div x-show="!dataLoaded" class="text-center py-20">
+                    <div class="max-w-2xl mx-auto">
+                        <i class="fas fa-brain text-6xl text-blue-500 mb-6"></i>
+                        <h2 class="text-3xl font-bold text-gray-800 mb-4">
+                            Bem-vindo ao Smart Analytics
+                        </h2>
+                        <p class="text-lg text-gray-600 mb-8">
+                            Sistema avançado de análise de dados com inteligência artificial para 
+                            interpretação automática de planilhas e geração de insights.
+                        </p>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
+                            <div class="bg-white p-6 rounded-lg shadow-sm">
+                                <i class="fas fa-upload text-3xl text-blue-500 mb-4"></i>
+                                <h3 class="font-semibold text-gray-800 mb-2">Upload Inteligente</h3>
+                                <p class="text-gray-600 text-sm">Suporte a Excel, CSV, Google Sheets com detecção automática de formato</p>
+                            </div>
+                            
+                            <div class="bg-white p-6 rounded-lg shadow-sm">
+                                <i class="fas fa-robot text-3xl text-green-500 mb-4"></i>
+                                <h3 class="font-semibold text-gray-800 mb-2">IA Integrada</h3>
+                                <p class="text-gray-600 text-sm">Machine learning para interpretação automática e insights inteligentes</p>
+                            </div>
+                            
+                            <div class="bg-white p-6 rounded-lg shadow-sm">
+                                <i class="fas fa-chart-line text-3xl text-purple-500 mb-4"></i>
+                                <h3 class="font-semibold text-gray-800 mb-2">Visualizações Avançadas</h3>
+                                <p class="text-gray-600 text-sm">Gráficos interativos e dashboards personalizáveis</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Dashboard -->
+                <div x-show="dataLoaded">
+                    <!-- Tabs -->
+                    <div class="mb-6">
+                        <nav class="flex space-x-8 border-b border-gray-200">
+                            <button @click="activeTab = 'dashboard'" 
+                                    :class="{ 'border-blue-500 text-blue-600': activeTab === 'dashboard', 'border-transparent text-gray-500': activeTab !== 'dashboard' }"
+                                    class="py-2 px-1 border-b-2 font-medium text-sm hover:text-gray-700">
+                                <i class="fas fa-chart-pie mr-2"></i>Dashboard
+                            </button>
+                            
+                            <button @click="activeTab = 'insights'" 
+                                    :class="{ 'border-blue-500 text-blue-600': activeTab === 'insights', 'border-transparent text-gray-500': activeTab !== 'insights' }"
+                                    class="py-2 px-1 border-b-2 font-medium text-sm hover:text-gray-700">
+                                <i class="fas fa-lightbulb mr-2"></i>Insights
+                            </button>
+                            
+                            <button @click="activeTab = 'statistics'" 
+                                    :class="{ 'border-blue-500 text-blue-600': activeTab === 'statistics', 'border-transparent text-gray-500': activeTab !== 'statistics' }"
+                                    class="py-2 px-1 border-b-2 font-medium text-sm hover:text-gray-700">
+                                <i class="fas fa-calculator mr-2"></i>Estatísticas
+                            </button>
+                            
+                            <button @click="activeTab = 'data'" 
+                                    :class="{ 'border-blue-500 text-blue-600': activeTab === 'data', 'border-transparent text-gray-500': activeTab !== 'data' }"
+                                    class="py-2 px-1 border-b-2 font-medium text-sm hover:text-gray-700">
+                                <i class="fas fa-table mr-2"></i>Dados
+                            </button>
+                        </nav>
+                    </div>
+
+                    <!-- Dashboard Tab -->
+                    <div x-show="activeTab === 'dashboard'">
+                        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                            <template x-for="(chart, index) in dashboardCharts" :key="index">
+                                <div class="bg-white rounded-lg shadow-sm p-6">
+                                    <div class="flex justify-between items-center mb-4">
+                                        <h3 class="text-lg font-semibold text-gray-800" x-text="chart.title"></h3>
+                                        <button @click="expandChart(chart)" class="text-gray-500 hover:text-gray-700">
+                                            <i class="fas fa-expand"></i>
+                                        </button>
+                                    </div>
+                                    <div :id="'chart-' + index" class="chart-container"></div>
+                                </div>
+                            </template>
+                        </div>
+                        
+                        <div x-show="dashboardCharts.length === 0" class="text-center py-12">
+                            <i class="fas fa-chart-bar text-4xl text-gray-400 mb-4"></i>
+                            <p class="text-gray-600">Clique em "Dashboard Automático" para gerar visualizações</p>
+                        </div>
+                    </div>
+
+                    <!-- Insights Tab -->
+                    <div x-show="activeTab === 'insights'">
+                        <div class="space-y-6">
+                            <template x-for="(insight, index) in insights" :key="index">
+                                <div class="insight-card bg-white rounded-lg shadow-sm p-6">
+                                    <div class="flex items-start space-x-4">
+                                        <div class="flex-shrink-0">
+                                            <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                                <i class="fas fa-lightbulb text-blue-600"></i>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="flex-1">
+                                            <h3 class="text-lg font-semibold text-gray-800 mb-2" x-text="insight.title"></h3>
+                                            <p class="text-gray-600 mb-3" x-text="insight.description"></p>
+                                            
+                                            <div x-show="insight.recommendation" class="bg-blue-50 p-3 rounded-lg">
+                                                <p class="text-sm text-blue-800">
+                                                    <i class="fas fa-info-circle mr-1"></i>
+                                                    <span x-text="insight.recommendation"></span>
+                                                </p>
+                                            </div>
+                                            
+                                            <div class="flex justify-between items-center mt-4">
+                                                <span class="text-xs text-gray-500" x-text="insight.category"></span>
+                                                <div class="flex items-center">
+                                                    <span class="text-xs text-gray-500 mr-2">Importância:</span>
+                                                    <div class="flex space-x-1">
+                                                        <template x-for="i in 5" :key="i">
+                                                            <div class="w-2 h-2 rounded-full" 
+                                                                 :class="i <= (insight.importance * 5) ? 'bg-yellow-400' : 'bg-gray-200'"></div>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                        
+                        <div x-show="insights.length === 0" class="text-center py-12">
+                            <i class="fas fa-lightbulb text-4xl text-gray-400 mb-4"></i>
+                            <p class="text-gray-600">Nenhum insight disponível</p>
+                        </div>
+                    </div>
+
+                    <!-- Statistics Tab -->
+                    <div x-show="activeTab === 'statistics'">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <!-- Descriptive Statistics -->
+                            <div class="bg-white rounded-lg shadow-sm p-6">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                    <i class="fas fa-chart-bar mr-2"></i>Estatísticas Descritivas
+                                </h3>
+                                
+                                <div class="space-y-4" x-show="statisticalData.descriptive_stats">
+                                    <!-- Statistics content will be populated by Alpine.js -->
+                                </div>
+                            </div>
+                            
+                            <!-- Correlations -->
+                            <div class="bg-white rounded-lg shadow-sm p-6">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                    <i class="fas fa-link mr-2"></i>Correlações
+                                </h3>
+                                
+                                <div class="space-y-3" x-show="statisticalData.correlations">
+                                    <template x-for="corr in statisticalData.correlations.slice(0, 5)" :key="corr">
+                                        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                                            <span class="text-sm font-medium" x-text="corr.variable_1 + ' ↔ ' + corr.variable_2"></span>
+                                            <span class="text-sm font-bold" 
+                                                  :class="corr.correlation > 0 ? 'text-green-600' : 'text-red-600'"
+                                                  x-text="corr.correlation.toFixed(3)"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Data Tab -->
+                    <div x-show="activeTab === 'data'">
+                        <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                            <div class="px-6 py-4 border-b border-gray-200">
+                                <h3 class="text-lg font-semibold text-gray-800">
+                                    <i class="fas fa-table mr-2"></i>Prévia dos Dados
+                                </h3>
+                            </div>
+                            
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <template x-for="col in Object.keys(columnTypes)" :key="col">
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    <div>
+                                                        <span x-text="col"></span>
+                                                        <div class="text-xs text-gray-400 normal-case" x-text="columnTypes[col].type"></div>
+                                                    </div>
+                                                </th>
+                                            </template>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        <!-- Data rows will be populated -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <!-- Help Modal -->
+    <div x-show="showHelp" x-transition class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-96 overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">Ajuda - Smart Analytics</h3>
+                    <button @click="showHelp = false" class="text-gray-500 hover:text-gray-700" title="Fechar">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-4 text-sm text-gray-600">
+                    <p><strong>Upload de Arquivos:</strong> Suporte a Excel (.xlsx, .xls), CSV, JSON e Google Sheets públicos.</p>
+                    <p><strong>Análise Automática:</strong> O sistema detecta automaticamente tipos de dados, relacionamentos e gera insights.</p>
+                    <p><strong>Visualizações:</strong> Gráficos são recomendados baseados na estrutura dos dados.</p>
+                    <p><strong>Insights:</strong> Análises estatísticas automáticas com recomendações.</p>
+                    <p><strong>Exportação:</strong> Relatórios completos em JSON ou Markdown.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        function smartAnalytics() {
+            return {
+                // State
+                sidebarOpen: true,
+                loading: false,
+                dataLoaded: false,
+                showHelp: false,
+                activeTab: 'dashboard',
+                
+                // Data
+                metadata: {},
+                columnTypes: {},
+                insights: [],
+                chartRecommendations: [],
+                dashboardCharts: [],
+                statisticalData: {},
+                dataQualityScore: 0,
+                googleSheetsUrl: '',
+                
+                // Computed
+                get numericColumns() {
+                    return Object.values(this.columnTypes).filter(col => col.type === 'numeric').length;
+                },
+                
+                get categoricalColumns() {
+                    return Object.values(this.columnTypes).filter(col => col.type === 'categorical').length;
+                },
+                
+                // Methods
+                async handleFileSelect(event) {
+                    const files = event.target.files;
+                    if (files.length > 0) {
+                        await this.uploadFile(files[0]);
+                    }
+                },
+                
+                async handleFileDrop(event) {
+                    event.target.classList.remove('dragover');
+                    const files = event.dataTransfer.files;
+                    if (files.length > 0) {
+                        await this.uploadFile(files[0]);
+                    }
+                },
+                
+                async uploadFile(file) {
+                    this.loading = true;
+                    
+                    try {
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        
+                        const response = await fetch('/smart-analytics/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            this.processAnalysisResult(result);
+                            this.dataLoaded = true;
+                            this.showNotification('Arquivo processado com sucesso!', 'success');
+                        } else {
+                            this.showNotification(result.error, 'error');
+                        }
+                    } catch (error) {
+                        this.showNotification('Erro no upload: ' + error.message, 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                async loadFromUrl() {
+                    if (!this.googleSheetsUrl) return;
+                    
+                    this.loading = true;
+                    
+                    try {
+                        // Simula carregamento do Google Sheets
+                        // Em implementação real, seria necessário uma rota específica
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        this.showNotification('Funcionalidade em desenvolvimento', 'info');
+                    } catch (error) {
+                        this.showNotification('Erro ao carregar URL: ' + error.message, 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                processAnalysisResult(result) {
+                    this.metadata = result.metadata;
+                    this.columnTypes = result.column_types;
+                    this.insights = result.insights;
+                    this.chartRecommendations = result.chart_recommendations;
+                    this.dataQualityScore = result.statistical_summary.data_quality_score;
+                    this.statisticalData = result.statistical_summary;
+                },
+                
+                async generateDashboard() {
+                    this.loading = true;
+                    
+                    try {
+                        const response = await fetch('/smart-analytics/dashboard', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            // Cria dashboard com Plotly
+                            const figureData = JSON.parse(result.figure_json);
+                            
+                            this.dashboardCharts = [{
+                                title: result.title,
+                                data: figureData
+                            }];
+                            
+                            // Renderiza o gráfico
+                            this.$nextTick(() => {
+                                Plotly.newPlot('chart-0', figureData.data, figureData.layout, {responsive: true});
+                            });
+                            
+                            this.activeTab = 'dashboard';
+                            this.showNotification('Dashboard gerado com sucesso!', 'success');
+                        } else {
+                            this.showNotification(result.error, 'error');
+                        }
+                    } catch (error) {
+                        this.showNotification('Erro ao gerar dashboard: ' + error.message, 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                async createVisualization(recommendation) {
+                    try {
+                        const response = await fetch('/smart-analytics/visualize', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(recommendation)
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            const figureData = JSON.parse(result.figure_json);
+                            
+                            // Adiciona ao dashboard
+                            const chartIndex = this.dashboardCharts.length;
+                            this.dashboardCharts.push({
+                                title: result.title,
+                                data: figureData
+                            });
+                            
+                            // Renderiza o gráfico
+                            this.$nextTick(() => {
+                                Plotly.newPlot(`chart-${chartIndex}`, figureData.data, figureData.layout, {responsive: true});
+                            });
+                            
+                            this.activeTab = 'dashboard';
+                            this.showNotification('Gráfico criado com sucesso!', 'success');
+                        } else {
+                            this.showNotification(result.error, 'error');
+                        }
+                    } catch (error) {
+                        this.showNotification('Erro ao criar visualização: ' + error.message, 'error');
+                    }
+                },
+                
+                showInsights() {
+                    this.activeTab = 'insights';
+                },
+                
+                showStatistics() {
+                    this.activeTab = 'statistics';
+                },
+                
+                async exportAnalysis() {
+                    try {
+                        const response = await fetch('/smart-analytics/export', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ format: 'markdown' })
+                        });
+                        
+                        if (response.ok) {
+                            const blob = await response.blob();
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = 'smart_analytics_report.md';
+                            a.click();
+                            window.URL.revokeObjectURL(url);
+                            
+                            this.showNotification('Relatório exportado com sucesso!', 'success');
+                        } else {
+                            const result = await response.json();
+                            this.showNotification(result.error, 'error');
+                        }
+                    } catch (error) {
+                        this.showNotification('Erro na exportação: ' + error.message, 'error');
+                    }
+                },
+                
+                expandChart(chart) {
+                    // Implementar modal para gráfico expandido
+                    this.showNotification('Funcionalidade em desenvolvimento', 'info');
+                },
+                
+                showNotification(message, type) {
+                    // Sistema simples de notificação
+                    const notification = document.createElement('div');
+                    notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
+                        type === 'success' ? 'bg-green-500 text-white' :
+                        type === 'error' ? 'bg-red-500 text-white' :
+                        'bg-blue-500 text-white'
+                    }`;
+                    notification.textContent = message;
+                    
+                    document.body.appendChild(notification);
+                    
+                    setTimeout(() => {
+                        notification.remove();
+                    }, 5000);
+                }
+            }
+        }
+    </script>
+</body>
+</html>

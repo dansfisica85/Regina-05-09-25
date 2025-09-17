@@ -1,13 +1,33 @@
 from flask import Flask, request, render_template, jsonify, send_file, session
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
 import io
 import base64
 import os
 from werkzeug.utils import secure_filename
 import tempfile
+
+# Imports condicionais para evitar conflitos
+try:
+    import seaborn as sns
+except ImportError:
+    sns = None
+    print("Warning: seaborn não disponível")
+
+# Imports do Smart Analytics
+try:
+    from smart_analytics import (
+        DataTypeDetector, RelationshipDetector, 
+        SmartChartRecommender, AutoInsightGenerator
+    )
+    from universal_processor import UniversalSpreadsheetProcessor
+    from visualization_generator import AdvancedVisualizationGenerator
+    from statistical_analyzer import AutomatedStatisticalAnalyzer
+    SMART_ANALYTICS_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Smart Analytics não disponível: {e}")
+    SMART_ANALYTICS_AVAILABLE = False
 from datetime import datetime
 import json
 from typing import List, Dict, Any, Tuple
@@ -586,6 +606,338 @@ def download_relatorio():
         
     except Exception as e:
         return jsonify({'error': f'Erro ao gerar relatório: {str(e)}'}), 500
+
+# ============================= SMART ANALYTICS ROUTES ============================= #
+
+# Verificar se Smart Analytics está disponível (imports já feitos no topo)
+if not SMART_ANALYTICS_AVAILABLE:
+    print("Smart Analytics não está disponível. Verifique as dependências.")
+    print(f"Smart Analytics não disponível: {e}")
+
+@app.route('/smart-analytics')
+def smart_analytics_home():
+    """Página inicial do Smart Analytics"""
+    if not SMART_ANALYTICS_AVAILABLE:
+        return render_template('error.html', 
+                             message="Smart Analytics não disponível. Instale as dependências necessárias.")
+    
+    return render_template('smart_analytics.html')
+
+@app.route('/smart-analytics/upload', methods=['POST'])
+def smart_analytics_upload():
+    """Upload e processamento inteligente de planilhas"""
+    
+    if not SMART_ANALYTICS_AVAILABLE:
+        return jsonify({'error': 'Smart Analytics não disponível'}), 500
+    
+    try:
+        # Verifica se arquivo foi enviado
+        if 'file' not in request.files:
+            return jsonify({'error': 'Nenhum arquivo enviado'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'Nenhum arquivo selecionado'}), 400
+        
+        # Processa arquivo com processador universal
+        processor = UniversalSpreadsheetProcessor()
+        result = processor.process_file(file.read(), file.filename)
+        
+        if not result['success']:
+            return jsonify({'error': result['error']}), 400
+        
+        df = result['data']
+        metadata = result['metadata']
+        
+        # Limpeza inteligente dos dados
+        from universal_processor import SmartDataCleaner
+        cleaner = SmartDataCleaner()
+        df_clean, cleaning_log = cleaner.clean_dataframe(df)
+        
+        # Detecção de tipos de dados
+        detector = DataTypeDetector()
+        column_types = {}
+        for col in df_clean.columns:
+            column_types[col] = detector.detect_column_type(df_clean[col])
+        
+        # Detecção de relacionamentos
+        relationship_detector = RelationshipDetector()
+        relationships = relationship_detector.find_relationships(df_clean)
+        
+        # Recomendação de gráficos
+        chart_recommender = SmartChartRecommender()
+        chart_recommendations = chart_recommender.recommend_charts(df_clean, column_types)
+        
+        # Geração de insights automáticos
+        insight_generator = AutoInsightGenerator()
+        insights = insight_generator.generate_insights(df_clean, column_types, relationships)
+        
+        # Análise estatística completa
+        statistical_analyzer = AutomatedStatisticalAnalyzer()
+        statistical_analysis = statistical_analyzer.comprehensive_analysis(df_clean, column_types)
+        
+        # Salva dados na sessão
+        session['smart_analytics_data'] = {
+            'dataframe': df_clean.to_json(orient='records'),
+            'metadata': metadata,
+            'cleaning_log': cleaning_log,
+            'column_types': column_types,
+            'relationships': relationships,
+            'chart_recommendations': chart_recommendations,
+            'insights': insights,
+            'statistical_analysis': statistical_analysis
+        }
+        
+        return jsonify({
+            'success': True,
+            'message': 'Arquivo processado com sucesso',
+            'metadata': metadata,
+            'cleaning_log': cleaning_log,
+            'column_types': column_types,
+            'relationships': relationships,
+            'chart_recommendations': chart_recommendations[:5],  # Primeiras 5 recomendações
+            'insights': insights[:10],  # Primeiros 10 insights
+            'statistical_summary': {
+                'descriptive_stats': statistical_analysis.get('descriptive_stats', {}),
+                'data_quality_score': sum(info.get('quality_score', 0) for info in column_types.values()) / len(column_types) if column_types else 0
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Erro no processamento: {str(e)}'}), 500
+
+@app.route('/smart-analytics/visualize', methods=['POST'])
+def smart_analytics_visualize():
+    """Gera visualização baseada na configuração"""
+    
+    if not SMART_ANALYTICS_AVAILABLE:
+        return jsonify({'error': 'Smart Analytics não disponível'}), 500
+    
+    try:
+        # Recupera dados da sessão
+        if 'smart_analytics_data' not in session:
+            return jsonify({'error': 'Nenhum dado carregado. Faça upload primeiro.'}), 400
+        
+        data = session['smart_analytics_data']
+        df = pd.read_json(data['dataframe'], orient='records')
+        
+        # Configuração do gráfico
+        chart_config = request.json
+        
+        # Gera visualização
+        viz_generator = AdvancedVisualizationGenerator()
+        result = viz_generator.generate_visualization(df, chart_config)
+        
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'figure_json': result['figure_json'],
+                'chart_type': result['chart_type'],
+                'title': result['title'],
+                'description': result['description']
+            })
+        else:
+            return jsonify({'error': result['error']}), 400
+            
+    except Exception as e:
+        return jsonify({'error': f'Erro na visualização: {str(e)}'}), 500
+
+@app.route('/smart-analytics/dashboard', methods=['POST'])
+def smart_analytics_dashboard():
+    """Gera dashboard completo com múltiplas visualizações"""
+    
+    if not SMART_ANALYTICS_AVAILABLE:
+        return jsonify({'error': 'Smart Analytics não disponível'}), 500
+    
+    try:
+        # Recupera dados da sessão
+        if 'smart_analytics_data' not in session:
+            return jsonify({'error': 'Nenhum dado carregado. Faça upload primeiro.'}), 400
+        
+        data = session['smart_analytics_data']
+        df = pd.read_json(data['dataframe'], orient='records')
+        recommendations = data['chart_recommendations']
+        
+        # Gera dashboard
+        viz_generator = AdvancedVisualizationGenerator()
+        result = viz_generator.generate_dashboard(df, recommendations)
+        
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'figure_json': result['figure_json'],
+                'chart_count': result['chart_count'],
+                'title': result['title']
+            })
+        else:
+            return jsonify({'error': result['error']}), 400
+            
+    except Exception as e:
+        return jsonify({'error': f'Erro no dashboard: {str(e)}'}), 500
+
+@app.route('/smart-analytics/insights')
+def smart_analytics_insights():
+    """Retorna todos os insights gerados"""
+    
+    if not SMART_ANALYTICS_AVAILABLE:
+        return jsonify({'error': 'Smart Analytics não disponível'}), 500
+    
+    try:
+        if 'smart_analytics_data' not in session:
+            return jsonify({'error': 'Nenhum dado carregado. Faça upload primeiro.'}), 400
+        
+        data = session['smart_analytics_data']
+        
+        return jsonify({
+            'success': True,
+            'insights': data['insights'],
+            'statistical_analysis': data['statistical_analysis'],
+            'relationships': data['relationships'],
+            'column_types': data['column_types']
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Erro ao recuperar insights: {str(e)}'}), 500
+
+@app.route('/smart-analytics/export', methods=['POST'])
+def smart_analytics_export():
+    """Exporta análise completa como relatório"""
+    
+    if not SMART_ANALYTICS_AVAILABLE:
+        return jsonify({'error': 'Smart Analytics não disponível'}), 500
+    
+    try:
+        if 'smart_analytics_data' not in session:
+            return jsonify({'error': 'Nenhum dado carregado. Faça upload primeiro.'}), 400
+        
+        data = session['smart_analytics_data']
+        export_format = request.json.get('format', 'json')
+        
+        if export_format == 'json':
+            # Exporta como JSON
+            return jsonify({
+                'success': True,
+                'data': {
+                    'metadata': data['metadata'],
+                    'cleaning_log': data['cleaning_log'],
+                    'column_types': data['column_types'],
+                    'relationships': data['relationships'],
+                    'insights': data['insights'],
+                    'statistical_analysis': data['statistical_analysis'],
+                    'chart_recommendations': data['chart_recommendations']
+                }
+            })
+        
+        elif export_format == 'markdown':
+            # Gera relatório em Markdown
+            report = generate_smart_analytics_report(data)
+            
+            # Salva arquivo temporário
+            temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8')
+            temp_file.write(report)
+            temp_file.close()
+            
+            filename = f'smart_analytics_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.md'
+            
+            return send_file(
+                temp_file.name,
+                as_attachment=True,
+                download_name=filename,
+                mimetype='text/markdown'
+            )
+        
+        else:
+            return jsonify({'error': 'Formato não suportado'}), 400
+            
+    except Exception as e:
+        return jsonify({'error': f'Erro na exportação: {str(e)}'}), 500
+
+def generate_smart_analytics_report(data: Dict[str, Any]) -> str:
+    """Gera relatório detalhado em Markdown"""
+    
+    report = f"""# Relatório de Smart Analytics
+    
+**Data de Geração:** {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}
+
+## 📊 Metadados do Arquivo
+
+- **Tipo de Fonte:** {data['metadata'].get('source_type', 'Desconhecido')}
+- **Linhas:** {data['metadata'].get('rows', 0):,}
+- **Colunas:** {data['metadata'].get('columns', 0)}
+
+## 🧹 Log de Limpeza
+
+"""
+    
+    # Adiciona informações de limpeza
+    cleaning_ops = data['cleaning_log'].get('operations', [])
+    if cleaning_ops:
+        for op in cleaning_ops:
+            report += f"- **{op.get('operation', 'Operação')}:** {op.get('description', '')}\n"
+    else:
+        report += "- Nenhuma operação de limpeza necessária\n"
+    
+    report += "\n## 📈 Tipos de Dados Detectados\n\n"
+    
+    # Tipos de colunas
+    for col, info in data['column_types'].items():
+        report += f"- **{col}:** {info['type']}"
+        if info.get('subtype'):
+            report += f" ({info['subtype']})"
+        report += f" - Qualidade: {info.get('quality_score', 0):.2f}\n"
+    
+    report += "\n## 🔍 Insights Principais\n\n"
+    
+    # Top 5 insights
+    insights = data['insights'][:5]
+    for i, insight in enumerate(insights, 1):
+        report += f"### {i}. {insight['title']}\n\n"
+        report += f"{insight['description']}\n\n"
+        if insight.get('recommendation'):
+            report += f"**Recomendação:** {insight['recommendation']}\n\n"
+    
+    report += "\n## 📊 Relacionamentos Detectados\n\n"
+    
+    # Correlações
+    correlations = data['relationships'].get('correlations', [])
+    if correlations:
+        report += "### Correlações Fortes\n\n"
+        for corr in correlations[:5]:
+            report += f"- **{corr['column1']} ↔ {corr['column2']}:** {corr['correlation']:.3f} ({corr['strength']})\n"
+    
+    # Clusters
+    clusters = data['relationships'].get('clusters', [])
+    if clusters:
+        report += "\n### Grupos de Colunas Similares\n\n"
+        for cluster in clusters:
+            report += f"- **Grupo {cluster['cluster_id']}:** {', '.join(cluster['columns'])}\n"
+    
+    report += "\n## 📈 Análise Estatística\n\n"
+    
+    # Estatísticas descritivas
+    desc_stats = data['statistical_analysis'].get('descriptive_stats', {})
+    if 'numeric' in desc_stats:
+        report += "### Estatísticas Numéricas\n\n"
+        basic_stats = desc_stats['numeric'].get('basic_stats', {})
+        for col, stats in list(basic_stats.items())[:3]:  # Primeiras 3 colunas
+            report += f"**{col}:**\n"
+            if isinstance(stats, dict):
+                report += f"- Média: {stats.get('mean', 0):.2f}\n"
+                report += f"- Mediana: {stats.get('50%', 0):.2f}\n"
+                report += f"- Desvio Padrão: {stats.get('std', 0):.2f}\n\n"
+    
+    report += "\n## 🎯 Recomendações de Visualização\n\n"
+    
+    # Top 3 recomendações de gráficos
+    chart_recs = data['chart_recommendations'][:3]
+    for i, rec in enumerate(chart_recs, 1):
+        report += f"{i}. **{rec['title']}** ({rec['chart_type']})\n"
+        report += f"   - {rec['description']}\n"
+        report += f"   - Relevância: {rec['relevance_score']:.2f}\n\n"
+    
+    report += f"\n---\n*Relatório gerado pelo Sistema Smart Analytics*"
+    
+    return report
 
 @app.route('/health')
 def health_check():
