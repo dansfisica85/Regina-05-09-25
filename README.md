@@ -13,12 +13,14 @@ Agora o sistema também processa automaticamente planilhas no modelo "APRENDIZAG
 - Gera um heatmap adicional (Engajamento / Acertos por Área) exibido automaticamente quando uma planilha SAEB é enviada.
 
 ### Como usar com SAEB
+
 1. Inclua o arquivo no upload normal (não é necessário renomear).
 2. O sistema identifica o formato e mostra mensagem: `(SAEB) processado`.
 3. Um segundo gráfico (heatmap) aparecerá abaixo do gráfico de comparação geral.
 4. O relatório Markdown inclui as médias agregadas por escola (o detalhamento período a período é utilizado apenas para gerar o heatmap e otimizar tamanho de sessão).
 
 ### Limitações atuais SAEB
+
 - O relatório não lista cada quinzena separadamente (focado em média agregada por Escola/Área/Métrica).
 - Se a estrutura for alterada (ex.: remoção de linhas de cabeçalho), a detecção pode falhar.
 
@@ -27,7 +29,8 @@ Se precisar de exportação detalhada (todas as quinzenas e métricas em tabela)
 ## �🚀 Deploy no Vercel
 
 ### Pré-requisitos
-- Conta no Vercel (https://vercel.com)
+
+- Conta no [Vercel](https://vercel.com)
 - Vercel CLI instalado ou usar o dashboard web
 
 ### Opção 1: Deploy via Dashboard Vercel (Recomendado)
