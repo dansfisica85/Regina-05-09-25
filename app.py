@@ -612,7 +612,6 @@ def download_relatorio():
 # Verificar se Smart Analytics está disponível (imports já feitos no topo)
 if not SMART_ANALYTICS_AVAILABLE:
     print("Smart Analytics não está disponível. Verifique as dependências.")
-    print(f"Smart Analytics não disponível: {e}")
 
 @app.route('/smart-analytics')
 def smart_analytics_home():
@@ -944,4 +943,4 @@ def health_check():
     return jsonify({'status': 'healthy', 'message': 'Sistema de análise educacional funcionando'})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='127.0.0.1', port=5000, debug=False)
