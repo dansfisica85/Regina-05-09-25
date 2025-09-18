@@ -484,6 +484,12 @@ Este relatório apresenta a análise detalhada dos dados educacionais processado
 
 @app.route('/')
 def index():
+    """Página principal unificada com todas as funcionalidades"""
+    return render_template('unified_analytics.html')
+
+@app.route('/legacy')
+def legacy_index():
+    """Página SAEB tradicional (mantida para compatibilidade)"""
     return render_template('index.html')
 
 @app.route('/upload', methods=['POST'])
@@ -1060,24 +1066,10 @@ def api_get_analysis(analysis_id):
         db_connector.log_event('ERROR', f'Erro ao buscar análise {analysis_id}: {str(e)}', 'api')
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/database-status')
-def database_status():
-    """Página de status do banco de dados"""
-    try:
-        stats = db_connector.get_system_stats()
-        recent_analyses = db_connector.get_recent_analyses(5)
-        
-        return render_template('database_status.html', 
-                             stats=stats, 
-                             recent_analyses=recent_analyses,
-                             turso_url=os.getenv('TURSO_DATABASE_URL', 'N/A'))
-    except Exception as e:
-        return f"Erro ao acessar banco de dados: {str(e)}", 500
-
 @app.route('/auto-analysis')
 def auto_analysis_page():
-    """Página de análise automática inteligente"""
-    return render_template('auto_analysis.html')
+    """Redireciona para página principal unificada"""
+    return render_template('unified_analytics.html')
 
 @app.route('/auto-analysis', methods=['POST'])
 def auto_analysis_process():
