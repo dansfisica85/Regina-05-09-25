@@ -59,7 +59,8 @@ class AutoStructureAnalyzer:
             'patterns': self._detect_patterns(df)
         }
         
-        return results
+        # Converter todos os tipos NumPy para tipos Python nativos
+        return convert_numpy_types(results)
     
     def _analyze_columns(self, df: pd.DataFrame) -> Dict[str, Dict]:
         """
@@ -182,13 +183,16 @@ class AutoStructureAnalyzer:
         """
         numeric_series = pd.to_numeric(series, errors='coerce').dropna()
         
+        if len(numeric_series) == 0:
+            return {}
+        
         return {
             'min': float(numeric_series.min()),
             'max': float(numeric_series.max()),
             'mean': float(numeric_series.mean()),
             'median': float(numeric_series.median()),
             'std': float(numeric_series.std()),
-            'outliers_count': self._count_outliers(numeric_series),
+            'outliers_count': int(self._count_outliers(numeric_series)),
             'distribution_type': self._detect_distribution(numeric_series)
         }
     
