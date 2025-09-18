@@ -7,6 +7,11 @@ import base64
 import os
 from werkzeug.utils import secure_filename
 import tempfile
+import time
+import uuid
+
+# Database connector
+from database_connector import init_database, db_connector
 
 # Imports condicionais para evitar conflitos
 try:
@@ -28,6 +33,15 @@ try:
 except ImportError as e:
     print(f"Warning: Smart Analytics não disponível: {e}")
     SMART_ANALYTICS_AVAILABLE = False
+
+# Imports para análise automática
+try:
+    from auto_structure_analyzer import AutoStructureAnalyzer, detect_file_structure
+    from intelligent_chart_generator import IntelligentChartGenerator
+    AUTO_ANALYSIS_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Auto Analysis não disponível: {e}")
+    AUTO_ANALYSIS_AVAILABLE = False
 from datetime import datetime
 import json
 from typing import List, Dict, Any, Tuple
@@ -35,6 +49,10 @@ from typing import List, Dict, Any, Tuple
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 app.secret_key = 'regina_analise_educacional_2025'  # Para sessions
+
+# Inicializar banco de dados
+db = init_database()
+print("✅ Banco de dados Turso conectado e inicializado")
 
 # Configurar matplotlib para usar uma fonte que suporte caracteres especiais
 plt.rcParams['font.family'] = 'DejaVu Sans'
@@ -629,6 +647,12 @@ def smart_analytics_upload():
     if not SMART_ANALYTICS_AVAILABLE:
         return jsonify({'error': 'Smart Analytics não disponível'}), 500
     
+    start_time = time.time()
+    session_id = session.get('session_id')
+    if not session_id:
+        session_id = str(uuid.uuid4())
+        session['session_id'] = session_id
+    
     try:
         # Verifica se arquivo foi enviado
         if 'file' not in request.files:
@@ -638,11 +662,18 @@ def smart_analytics_upload():
         if file.filename == '':
             return jsonify({'error': 'Nenhum arquivo selecionado'}), 400
         
+        filename = secure_filename(file.filename)
+        file_type = filename.split('.')[-1].lower() if '.' in filename else 'unknown'
+        
+        # Log início do processamento
+        db_connector.log_event('INFO', f'Iniciando processamento: {filename}', 'smart_analytics')
+        
         # Processa arquivo com processador universal
         processor = UniversalSpreadsheetProcessor()
         result = processor.process_file(file.read(), file.filename)
         
         if not result['success']:
+            db_connector.log_event('ERROR', f'Erro no processamento: {result["error"]}', 'smart_analytics')
             return jsonify({'error': result['error']}), 400
         
         df = result['data']
@@ -675,8 +706,54 @@ def smart_analytics_upload():
         statistical_analyzer = AutomatedStatisticalAnalyzer()
         statistical_analysis = statistical_analyzer.comprehensive_analysis(df_clean, column_types)
         
+        # Calcula métricas de performance
+        processing_time = time.time() - start_time
+        data_rows, data_columns = df_clean.shape
+        charts_generated = len(chart_recommendations)
+        insights_generated = len(insights)
+        
+        # Prepara dados para salvamento
+        analysis_data = {
+            'dataframe_summary': {
+                'rows': data_rows,
+                'columns': data_columns,
+                'column_names': list(df_clean.columns)
+            },
+            'metadata': metadata,
+            'cleaning_log': cleaning_log,
+            'column_types': column_types,
+            'relationships': relationships
+        }
+        
+        charts_data = {
+            'recommendations': chart_recommendations,
+            'total_charts': charts_generated
+        }
+        
+        # Salva análise no banco de dados
+        analysis_id = db_connector.save_analysis(
+            session_id=session_id,
+            filename=filename,
+            file_type=file_type,
+            analysis_data=analysis_data,
+            insights=insights,
+            charts_data=charts_data,
+            statistics=statistical_analysis
+        )
+        
+        # Salva métricas de performance
+        db_connector.save_performance_metrics(
+            analysis_id=analysis_id,
+            processing_time=processing_time,
+            data_rows=data_rows,
+            data_columns=data_columns,
+            charts_generated=charts_generated,
+            insights_generated=insights_generated
+        )
+        
         # Salva dados na sessão
         session['smart_analytics_data'] = {
+            'analysis_id': analysis_id,
             'dataframe': df_clean.to_json(orient='records'),
             'metadata': metadata,
             'cleaning_log': cleaning_log,
@@ -687,9 +764,14 @@ def smart_analytics_upload():
             'statistical_analysis': statistical_analysis
         }
         
+        # Log sucesso
+        db_connector.log_event('INFO', f'Análise concluída com sucesso: {filename} (ID: {analysis_id})', 'smart_analytics')
+        
         return jsonify({
             'success': True,
             'message': 'Arquivo processado com sucesso',
+            'analysis_id': analysis_id,
+            'processing_time': round(processing_time, 2),
             'metadata': metadata,
             'cleaning_log': cleaning_log,
             'column_types': column_types,
@@ -703,6 +785,7 @@ def smart_analytics_upload():
         })
         
     except Exception as e:
+        db_connector.log_event('ERROR', f'Erro no processamento de {filename if "filename" in locals() else "arquivo"}: {str(e)}', 'smart_analytics')
         return jsonify({'error': f'Erro no processamento: {str(e)}'}), 500
 
 @app.route('/smart-analytics/visualize', methods=['POST'])
@@ -942,5 +1025,217 @@ def generate_smart_analytics_report(data: Dict[str, Any]) -> str:
 def health_check():
     return jsonify({'status': 'healthy', 'message': 'Sistema de análise educacional funcionando'})
 
+# ============================= ROTAS DO BANCO DE DADOS ============================= #
+
+@app.route('/api/dashboard')
+def api_dashboard():
+    """API para dados do dashboard"""
+    try:
+        stats = db_connector.get_system_stats()
+        recent_analyses = db_connector.get_recent_analyses(10)
+        
+        return jsonify({
+            'success': True,
+            'stats': stats,
+            'recent_analyses': recent_analyses,
+            'database_status': 'connected'
+        })
+    except Exception as e:
+        db_connector.log_event('ERROR', f'Erro na API dashboard: {str(e)}', 'api')
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/analysis/<int:analysis_id>')
+def api_get_analysis(analysis_id):
+    """Busca análise específica por ID"""
+    try:
+        analysis = db_connector.get_analysis_by_id(analysis_id)
+        if analysis:
+            return jsonify({
+                'success': True,
+                'analysis': analysis
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Análise não encontrada'}), 404
+    except Exception as e:
+        db_connector.log_event('ERROR', f'Erro ao buscar análise {analysis_id}: {str(e)}', 'api')
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/database-status')
+def database_status():
+    """Página de status do banco de dados"""
+    try:
+        stats = db_connector.get_system_stats()
+        recent_analyses = db_connector.get_recent_analyses(5)
+        
+        return render_template('database_status.html', 
+                             stats=stats, 
+                             recent_analyses=recent_analyses,
+                             turso_url=os.getenv('TURSO_DATABASE_URL', 'N/A'))
+    except Exception as e:
+        return f"Erro ao acessar banco de dados: {str(e)}", 500
+
+@app.route('/auto-analysis')
+def auto_analysis_page():
+    """Página de análise automática inteligente"""
+    return render_template('auto_analysis.html')
+
+@app.route('/auto-analysis', methods=['POST'])
+def auto_analysis_process():
+    """Processa dados automaticamente e gera gráficos inteligentes"""
+    if not AUTO_ANALYSIS_AVAILABLE:
+        return jsonify({
+            'success': False,
+            'error': 'Sistema de análise automática não disponível'
+        }), 500
+    
+    session_id = session.get('session_id', str(uuid.uuid4()))
+    session['session_id'] = session_id
+    start_time = time.time()
+    
+    try:
+        df = None
+        filename = 'dados_colados'
+        
+        # Verifica se é upload de arquivo ou dados colados
+        if 'file' in request.files:
+            file = request.files['file']
+            if file.filename == '':
+                return jsonify({'success': False, 'error': 'Nenhum arquivo selecionado'}), 400
+            
+            filename = secure_filename(file.filename)
+            
+            # Processa arquivo baseado na extensão
+            if filename.endswith(('.xlsx', '.xls')):
+                df = pd.read_excel(io.BytesIO(file.read()))
+            elif filename.endswith('.csv'):
+                # Tenta diferentes separadores para CSV
+                file_content = file.read().decode('utf-8', errors='ignore')
+                for sep in [',', ';', '\t', '|']:
+                    try:
+                        df = pd.read_csv(io.StringIO(file_content), sep=sep)
+                        if df.shape[1] > 1:  # Se conseguiu separar em múltiplas colunas
+                            break
+                    except:
+                        continue
+                
+                if df is None or df.shape[1] <= 1:
+                    # Fallback para separador padrão
+                    df = pd.read_csv(io.StringIO(file_content))
+            
+        elif request.is_json:
+            # Dados colados
+            data = request.get_json()
+            paste_data = data.get('paste_data', '')
+            
+            if not paste_data.strip():
+                return jsonify({'success': False, 'error': 'Nenhum dado fornecido'}), 400
+            
+            # Tenta interpretar dados colados como CSV
+            for sep in [',', ';', '\t', '|']:
+                try:
+                    df = pd.read_csv(io.StringIO(paste_data), sep=sep)
+                    if df.shape[1] > 1:
+                        break
+                except:
+                    continue
+            
+            if df is None or df.shape[1] <= 1:
+                # Tenta como linhas separadas por quebra de linha
+                lines = paste_data.strip().split('\n')
+                if len(lines) > 1:
+                    # Primeira linha como cabeçalho
+                    headers = lines[0].split()
+                    data_rows = []
+                    for line in lines[1:]:
+                        row = line.split()
+                        if len(row) == len(headers):
+                            data_rows.append(row)
+                    
+                    if data_rows:
+                        df = pd.DataFrame(data_rows, columns=headers)
+        
+        if df is None or df.empty:
+            return jsonify({
+                'success': False,
+                'error': 'Não foi possível interpretar os dados. Verifique o formato.'
+            }), 400
+        
+        # Remove colunas completamente vazias
+        df = df.dropna(axis=1, how='all')
+        
+        # Se ainda estiver vazio
+        if df.empty:
+            return jsonify({
+                'success': False,
+                'error': 'Dados estão vazios após limpeza'
+            }), 400
+        
+        # Análise automática da estrutura
+        analyzer = AutoStructureAnalyzer()
+        analysis_results = analyzer.analyze_dataframe(df)
+        
+        # Gera gráficos inteligentes
+        chart_generator = IntelligentChartGenerator()
+        charts = chart_generator.generate_all_charts(df, analysis_results)
+        
+        # Calcula tempo de processamento
+        processing_time = time.time() - start_time
+        
+        # Salva no banco de dados
+        try:
+            analysis_data = {
+                'file_name': filename,
+                'data_shape': analysis_results['data_shape'],
+                'column_types': {col: info['type'] for col, info in analysis_results['column_analysis'].items()},
+                'data_quality_score': analysis_results['data_quality']['completeness_score'],
+                'charts_generated': len(charts),
+                'processing_time': processing_time,
+                'insights_count': len(analysis_results.get('patterns', [])),
+                'session_id': session_id
+            }
+            
+            analysis_id = db_connector.save_analysis(
+                session_id=session_id,
+                file_name=filename,
+                analysis_type='auto_analysis',
+                results=analysis_data,
+                processing_time=processing_time
+            )
+            
+            db_connector.log_event('SUCCESS', 
+                f'Análise automática concluída: {len(charts)} gráficos gerados', 
+                'auto_analysis')
+                
+        except Exception as db_error:
+            print(f"Erro ao salvar no banco: {db_error}")
+            # Continua sem falhar se houver erro no banco
+        
+        return jsonify({
+            'success': True,
+            'analysis': analysis_results,
+            'charts': charts,
+            'processing_time': processing_time,
+            'message': f'Análise concluída! {len(charts)} gráficos gerados automaticamente.'
+        })
+        
+    except Exception as e:
+        db_connector.log_event('ERROR', f'Erro na análise automática: {str(e)}', 'auto_analysis')
+        return jsonify({
+            'success': False,
+            'error': f'Erro durante análise: {str(e)}'
+        }), 500
+
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=5000, debug=False)
+    # Inicializar configurações do sistema
+    db_connector.set_config('system_version', '1.0.0')
+    db_connector.set_config('smart_analytics_enabled', True)
+    db_connector.set_config('auto_analysis_enabled', AUTO_ANALYSIS_AVAILABLE)
+    
+    print("🚀 Iniciando Regina Smart Analytics...")
+    print(f"📊 Banco de dados: {'Conectado' if db_connector else 'Erro'}")
+    print(f"🧠 Smart Analytics: {'Ativo' if SMART_ANALYTICS_AVAILABLE else 'Inativo'}")
+    print(f"🤖 Auto Analysis: {'Ativo' if AUTO_ANALYSIS_AVAILABLE else 'Inativo'}")
+    
+    print("🌐 Servidor iniciando em http://localhost:5001")
+    print("📈 Acesse /auto-analysis para análise automática de planilhas")
+    app.run(host='0.0.0.0', port=5001, debug=True, threaded=True)

@@ -53,8 +53,8 @@ body {
 /* Container Social */
 .social-container {
   background: var(--bg-card);
-  backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-strong);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -344,8 +344,8 @@ body {
 /* Sidebar */
 .sidebar {
   background: var(--bg-card);
-  backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   transition: all var(--transition-normal);
   border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
   box-shadow: var(--shadow-strong);
@@ -368,8 +368,8 @@ body {
   background: white;
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-medium);
-  backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.2);
   transition: all var(--transition-normal);
 }
@@ -386,8 +386,8 @@ body {
   padding: 60px 40px;
   text-align: center;
   box-shadow: var(--shadow-strong);
-  backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 

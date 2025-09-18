@@ -12,7 +12,7 @@ from sklearn.decomposition import PCA
 from sklearn.feature_extraction.text import TfidfVectorizer
 from scipy import stats
 from scipy.cluster.hierarchy import dendrogram, linkage
-import nltk
+# import nltk  # Removido temporariamente
 from typing import Dict, List, Tuple, Any, Optional
 import re
 import json
